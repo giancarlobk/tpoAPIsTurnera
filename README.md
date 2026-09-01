@@ -40,3 +40,91 @@ Todavía están pendientes:
 ## 📚 Documentación
 
 La definición del producto, el alcance, la arquitectura propuesta y la estimación de esfuerzo se encuentran en la [Propuesta de Producto](docs/Propuesta%20de%20Producto.docx).
+
+## 🧑‍⚕️ Consulta de médicos
+
+### `GET /api/doctores`
+
+Devuelve médicos activos ordenados por apellido, nombre e identificador. Los filtros son opcionales y se pueden combinar.
+
+| Parámetro | Tipo | Validación | Descripción |
+| --- | --- | --- | --- |
+| `especialidadId` | `Long` | Mayor que cero | Filtra por el identificador de la especialidad. |
+| `nombre` | `String` | No vacío; máximo 100 caracteres | Busca una coincidencia parcial sin distinguir mayúsculas. |
+
+**Ejemplos**
+
+```http
+GET /api/doctores
+GET /api/doctores?especialidadId=1
+GET /api/doctores?nombre=ana
+GET /api/doctores?especialidadId=1&nombre=ana
+```
+
+**Response `200 OK`**
+
+```json
+[
+  {
+    "id": 10,
+    "nombre": "Ana",
+    "apellido": "Alvarez",
+    "matriculaNacional": "MN-100",
+    "especialidadId": 1,
+    "especialidadNombre": "Cardiología"
+  }
+]
+```
+
+Si no existen coincidencias, responde `200 OK` con `[]`. Los filtros inválidos responden `400 Bad Request`. El DTO no expone contraseñas, horarios completos ni relaciones JPA.
+
+### Pruebas de médicos
+
+```bash
+./mvnw test
+```
+
+La suite incluye pruebas unitarias de filtros y mapeo, además de integración con Spring Boot, MockMvc, JPA y H2.
+
+## 🔐 Autenticación
+
+### `POST /api/auth/login`
+
+Valida las credenciales de pacientes, médicos y administradores activos. Las contraseñas almacenadas deben estar codificadas con **BCrypt**; nunca se devuelven en la respuesta.
+
+**Request**
+
+```json
+{
+  "email": "usuario@turnera.com",
+  "password": "ClaveSegura123"
+}
+```
+
+**Response `200 OK`**
+
+```json
+{
+  "id": 1,
+  "nombre": "Pablo",
+  "apellido": "Paciente",
+  "email": "usuario@turnera.com",
+  "rol": "PACIENTE"
+}
+```
+
+| Código | Motivo |
+| --- | --- |
+| `200 OK` | Credenciales válidas. |
+| `400 Bad Request` | Email con formato inválido o campos obligatorios vacíos. |
+| `401 Unauthorized` | Email o contraseña incorrectos, cuenta inactiva o email ambiguo entre tipos de usuario. |
+
+Este endpoint verifica identidad y rol. La emisión de tokens o la autorización de los demás endpoints queda fuera de esta entrega.
+
+### Pruebas del login
+
+```bash
+./mvnw test
+```
+
+Las pruebas incluyen casos unitarios, una prueba web del controller y un flujo integrado con `@SpringBootTest`: inicia Spring, usa MockMvc, persiste un paciente con BCrypt mediante JPA en una base H2 aislada y ejecuta el login completo sin mocks.
