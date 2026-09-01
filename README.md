@@ -40,3 +40,48 @@ Todavía están pendientes:
 ## 📚 Documentación
 
 La definición del producto, el alcance, la arquitectura propuesta y la estimación de esfuerzo se encuentran en la [Propuesta de Producto](docs/Propuesta%20de%20Producto.docx).
+
+## 🧑‍⚕️ Consulta de médicos
+
+### `GET /api/doctores`
+
+Devuelve médicos activos ordenados por apellido, nombre e identificador. Los filtros son opcionales y se pueden combinar.
+
+| Parámetro | Tipo | Validación | Descripción |
+| --- | --- | --- | --- |
+| `especialidadId` | `Long` | Mayor que cero | Filtra por el identificador de la especialidad. |
+| `nombre` | `String` | No vacío; máximo 100 caracteres | Busca una coincidencia parcial sin distinguir mayúsculas. |
+
+**Ejemplos**
+
+```http
+GET /api/doctores
+GET /api/doctores?especialidadId=1
+GET /api/doctores?nombre=ana
+GET /api/doctores?especialidadId=1&nombre=ana
+```
+
+**Response `200 OK`**
+
+```json
+[
+  {
+    "id": 10,
+    "nombre": "Ana",
+    "apellido": "Alvarez",
+    "matriculaNacional": "MN-100",
+    "especialidadId": 1,
+    "especialidadNombre": "Cardiología"
+  }
+]
+```
+
+Si no existen coincidencias, responde `200 OK` con `[]`. Los filtros inválidos responden `400 Bad Request`. El DTO no expone contraseñas, horarios completos ni relaciones JPA.
+
+### Pruebas de médicos
+
+```bash
+./mvnw test
+```
+
+La suite incluye pruebas unitarias de filtros y mapeo, además de integración con Spring Boot, MockMvc, JPA y H2.
