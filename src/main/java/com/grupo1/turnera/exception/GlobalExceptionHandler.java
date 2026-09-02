@@ -45,6 +45,21 @@ public class GlobalExceptionHandler {
         );
     }
 
+    // METODO para errores de email y dni duplidados
+    @ExceptionHandler({EmailDuplicadoException.class,DniDuplicadoException.class})
+
+    public ResponseEntity<ApiErrorResponse> handleDuplicado(
+        RuntimeException exception,
+        HttpServletRequest request
+    ){
+        return buildResponse(
+                HttpStatus.CONFLICT, // 409
+                exception.getMessage(),
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+
     private ResponseEntity<ApiErrorResponse> buildResponse(
             HttpStatus status,
             String message,
