@@ -1,98 +1,57 @@
-# 🩺 Turnero Médico
+# Turnero Médico
 
-> Aplicación web para administrar profesionales, disponibilidad y turnos médicos desde una única fuente de información.
+[![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/17/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](http://localhost:8080/v3/api-docs)
 
-Proyecto integrador de **Aplicaciones Interactivas**, desarrollado por un equipo de cinco integrantes.
+API REST para administrar autenticación, profesionales, pacientes y turnos médicos desde una única fuente de información.
 
-## 🎯 Objetivo
+> **Estado:** proyecto en desarrollo activo. Los contratos documentados a continuación corresponden a los endpoints disponibles actualmente.
 
-Digitalizar el circuito principal de turnos de un consultorio y ofrecer una experiencia simple para pacientes, profesionales y administradores.
+## Contenido
 
-## ✨ Alcance del MVP
+- [Visión general](#visión-general)
+- [API disponible](#api-disponible)
+- [Inicio rápido](#inicio-rápido)
+- [Documentación interactiva](#documentación-interactiva)
+- [Pruebas](#pruebas)
+- [Arquitectura y tecnologías](#arquitectura-y-tecnologías)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Roadmap](#roadmap)
 
-- 👤 Registro e inicio de sesión de usuarios.
-- 🧑‍⚕️ Gestión de especialidades y profesionales.
-- 📅 Configuración y consulta de disponibilidad.
-- ✅ Reserva, consulta y cancelación de turnos.
-- 🔄 Administración de estados de los turnos.
-- 🔒 Prevención de reservas superpuestas.
+## Visión general
 
-## 🧰 Tecnologías previstas
+Turnero Médico digitaliza el circuito principal de un consultorio y centraliza la información utilizada por pacientes, profesionales y administradores.
 
-| Capa | Tecnología |
-| --- | --- |
-| 🖥️ Frontend | React con JavaScript; Vite es opcional |
-| ⚙️ Backend | Java 17, Spring Boot, API REST y Spring Data JPA |
-| 🗄️ Base de datos | MySQL; H2 para pruebas o desarrollo local |
-| 🔗 Comunicación | HTTP/HTTPS y JSON |
+El backend está construido con Spring Boot y expone contratos HTTP/JSON. La persistencia utiliza MySQL en ejecución normal y H2 para las pruebas de integración.
 
-## 🚧 Estado del proyecto
-
-El proyecto se encuentra **en desarrollo**.
-
-Todavía están pendientes:
-
-- El contrato definitivo de la API.
-- La configuración completa de los entornos.
-- El paso a paso de instalación y ejecución.
-- La integración del frontend con el backend.
-
-## 📚 Documentación
-
-La definición del producto, el alcance, la arquitectura propuesta y la estimación de esfuerzo se encuentran en la [Propuesta de Producto](docs/Propuesta%20de%20Producto.docx).
-
-## 🧑‍⚕️ Consulta de médicos
-
-### `GET /api/doctores`
-
-Devuelve médicos activos ordenados por apellido, nombre e identificador. Los filtros son opcionales y se pueden combinar.
-
-| Parámetro | Tipo | Validación | Descripción |
-| --- | --- | --- | --- |
-| `especialidadId` | `Long` | Mayor que cero | Filtra por el identificador de la especialidad. |
-| `nombre` | `String` | No vacío; máximo 100 caracteres | Busca una coincidencia parcial sin distinguir mayúsculas. |
-
-**Ejemplos**
-
-```http
-GET /api/doctores
-GET /api/doctores?especialidadId=1
-GET /api/doctores?nombre=ana
-GET /api/doctores?especialidadId=1&nombre=ana
+```text
+Cliente HTTP
+    ↓
+Controllers (Spring MVC)
+    ↓
+Services
+    ↓
+Repositories (Spring Data JPA)
+    ↓
+MySQL / H2
 ```
 
-**Response `200 OK`**
+## API disponible
 
-```json
-[
-  {
-    "id": 10,
-    "nombre": "Ana",
-    "apellido": "Alvarez",
-    "matriculaNacional": "MN-100",
-    "especialidadId": 1,
-    "especialidadNombre": "Cardiología"
-  }
-]
-```
+URL base local: `http://localhost:8080`
 
-Si no existen coincidencias, responde `200 OK` con `[]`. Los filtros inválidos responden `400 Bad Request`. El DTO no expone contraseñas, horarios completos ni relaciones JPA.
+| Método | Endpoint | Descripción | Entrada principal | Respuestas |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/auth/login` | Autentica un paciente, médico o administrador activo. | `email`, `password` | `200`, `400`, `401` |
+| `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
+| `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201` |
+| `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
+| `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
 
-### Pruebas de médicos
+### Contratos high level
 
-```bash
-./mvnw test
-```
-
-La suite incluye pruebas unitarias de filtros y mapeo, además de integración con Spring Boot, MockMvc, JPA y H2.
-
-## 🔐 Autenticación
-
-### `POST /api/auth/login`
-
-Valida las credenciales de pacientes, médicos y administradores activos. Las contraseñas almacenadas deben estar codificadas con **BCrypt**; nunca se devuelven en la respuesta.
-
-**Request**
+#### Autenticación
 
 ```json
 {
@@ -101,30 +60,168 @@ Valida las credenciales de pacientes, médicos y administradores activos. Las co
 }
 ```
 
-**Response `200 OK`**
+Una autenticación exitosa devuelve el identificador, nombre, apellido, email y rol del usuario. La emisión de tokens todavía no forma parte del contrato actual.
+
+#### Búsqueda de médicos
+
+Los filtros son opcionales y se pueden combinar:
+
+```http
+GET /api/doctores
+GET /api/doctores?especialidadId=1
+GET /api/doctores?nombre=ana
+GET /api/doctores?especialidadId=1&nombre=ana
+```
+
+La respuesta contiene datos resumidos del profesional y su especialidad. No expone contraseñas, horarios completos ni relaciones JPA.
+
+#### Registro de pacientes
+
+El alta recibe los siguientes campos principales:
+
+```text
+dni, nombre, apellido, email, password, telefono,
+fechaNacimiento, obraSocial, numeroAfiliado
+```
+
+El servidor asigna el rol `PACIENTE` y activa la cuenta al registrarla.
+
+#### Turnos y sobreturnos
+
+Los contratos de turnos referencian al doctor y al paciente por identificador e incluyen:
 
 ```json
 {
-  "id": 1,
-  "nombre": "Pablo",
-  "apellido": "Paciente",
-  "email": "usuario@turnera.com",
-  "rol": "PACIENTE"
+  "doctor": { "id": 1 },
+  "paciente": { "id": 2 },
+  "fechaHoraInicio": "2026-09-10T10:00:00",
+  "fechaHoraFin": "2026-09-10T10:30:00",
+  "estado": "RESERVADO",
+  "esSobreturned": false,
+  "justificacionSobreturned": null
 }
 ```
 
-| Código | Motivo |
-| --- | --- |
-| `200 OK` | Credenciales válidas. |
-| `400 Bad Request` | Email con formato inválido o campos obligatorios vacíos. |
-| `401 Unauthorized` | Email o contraseña incorrectos, cuenta inactiva o email ambiguo entre tipos de usuario. |
+Para un sobreturno, `esSobreturned` debe representar esa condición y `justificacionSobreturned` describe el motivo.
 
-Este endpoint verifica identidad y rol. La emisión de tokens o la autorización de los demás endpoints queda fuera de esta entrega.
+## Inicio rápido
 
-### Pruebas del login
+### Requisitos
+
+- Docker Desktop con Docker Compose, o
+- Java 17 y una instancia MySQL disponible.
+
+### Ejecución con Docker Compose
+
+1. Clonar el repositorio:
+
+   ```bash
+   git clone https://github.com/giancarlobk/tpoAPIsTurnera.git
+   cd tpoAPIsTurnera
+   ```
+
+2. Crear el archivo local de variables:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+   En Linux o macOS:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Revisar las credenciales de desarrollo en `.env` y levantar los servicios:
+
+   ```bash
+   docker compose up --build
+   ```
+
+4. Detener los contenedores conservando los datos:
+
+   ```bash
+   docker compose down
+   ```
+
+Servicios expuestos por defecto:
+
+| Servicio | Puerto | Propósito |
+| --- | --- | --- |
+| Backend | `8080` | API REST y documentación OpenAPI |
+| MySQL | `3306` | Persistencia del entorno local |
+
+> Las credenciales de `.env.example` son únicamente de desarrollo y deben reemplazarse fuera del entorno local.
+
+## Documentación interactiva
+
+Con la aplicación en ejecución:
+
+- [Swagger UI](http://localhost:8080/swagger-ui.html): exploración y prueba interactiva de los endpoints.
+- [OpenAPI JSON](http://localhost:8080/v3/api-docs): especificación consumible por herramientas y clientes.
+
+La especificación cubre todos los endpoints actuales y utiliza esquemas públicos que omiten contraseñas y relaciones internas de persistencia.
+
+## Pruebas
+
+Windows:
+
+```powershell
+.\mvnw.cmd test
+```
+
+Linux o macOS:
 
 ```bash
 ./mvnw test
 ```
 
-Las pruebas incluyen casos unitarios, una prueba web del controller y un flujo integrado con `@SpringBootTest`: inicia Spring, usa MockMvc, persiste un paciente con BCrypt mediante JPA en una base H2 aislada y ejecuta el login completo sin mocks.
+La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc, JPA y H2. También verifica que `/v3/api-docs` y Swagger UI estén disponibles y que la especificación incluya los cinco contratos actuales.
+
+## Arquitectura y tecnologías
+
+| Área | Tecnología |
+| --- | --- |
+| Lenguaje | Java 17 |
+| Framework | Spring Boot 4.1, Spring MVC |
+| Persistencia | Spring Data JPA, Hibernate |
+| Base de datos | MySQL 8.4; H2 para pruebas |
+| Contratos API | OpenAPI 3.1, Springdoc, Swagger UI |
+| Validación | Jakarta Validation |
+| Seguridad de contraseñas | BCrypt |
+| Build y pruebas | Maven Wrapper, JUnit, MockMvc |
+| Contenedores | Docker, Docker Compose |
+
+## Estructura del proyecto
+
+```text
+.
+├── docs/                         # Documentación funcional del producto
+├── src/main/java/.../config/     # Configuración general y OpenAPI
+├── src/main/java/.../controller/ # Endpoints HTTP
+├── src/main/java/.../dto/        # Contratos de entrada y salida
+├── src/main/java/.../model/      # Entidades JPA y enumeraciones
+├── src/main/java/.../repository/ # Acceso a datos
+├── src/main/java/.../service/    # Lógica de aplicación
+├── src/test/                     # Pruebas unitarias e integración
+├── compose.yaml                  # Backend y MySQL para desarrollo
+├── Dockerfile                    # Imagen del backend
+└── pom.xml                       # Dependencias y build Maven
+```
+
+## Roadmap
+
+El MVP prevé incorporar progresivamente:
+
+- consulta y cancelación de turnos;
+- configuración y consulta de disponibilidad;
+- administración completa de estados;
+- prevención de reservas superpuestas;
+- autenticación basada en tokens y autorización por roles;
+- integración con el frontend.
+
+## Documentación del producto
+
+La definición funcional, el alcance, la arquitectura propuesta y la estimación de esfuerzo se encuentran en la [Propuesta de Producto](docs/Propuesta%20de%20Producto.docx).
+
+Proyecto integrador de **Aplicaciones Interactivas**, desarrollado por un equipo de cinco integrantes.
