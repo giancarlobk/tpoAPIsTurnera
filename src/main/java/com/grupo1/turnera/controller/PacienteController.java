@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class PacienteController {
 
     private final PacienteService pacienteService;
-
+        
     @PostMapping // Este metodo recibe POST /api/pacientes
     @Operation(summary = "Registrar paciente", description = "Crea un paciente con rol PACIENTE y estado activo.")
     @ApiResponse(responseCode = "201", description = "Paciente registrado",

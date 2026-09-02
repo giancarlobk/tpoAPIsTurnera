@@ -45,8 +45,11 @@ public class GlobalExceptionHandler {
         );
     }
 
-    // METODO para errores de email y dni duplidados
-    @ExceptionHandler({EmailDuplicadoException.class,DniDuplicadoException.class})
+    // Metodo errores de datos Duplicados
+    @ExceptionHandler({EmailDuplicadoException.class,
+                        DniDuplicadoException.class,
+                        NumAfiliadoDuplicadoException.class,
+                        TelefonoDuplicadoException.class})
 
     public ResponseEntity<ApiErrorResponse> handleDuplicado(
         RuntimeException exception,

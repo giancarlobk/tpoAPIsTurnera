@@ -2,6 +2,8 @@ package com.grupo1.turnera.service;
 
 import com.grupo1.turnera.exception.DniDuplicadoException;
 import com.grupo1.turnera.exception.EmailDuplicadoException;
+import com.grupo1.turnera.exception.NumAfiliadoDuplicadoException;
+import com.grupo1.turnera.exception.TelefonoDuplicadoException;
 import com.grupo1.turnera.model.Paciente;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.PacienteRepository;
@@ -24,7 +26,14 @@ public class PacienteService {
         if (pacienteRepository.findByDni(paciente.getDni()).isPresent()){
             throw new DniDuplicadoException(paciente.getDni());
         }
-
+        if (pacienteRepository.findByTelefono(paciente.getTelefono()).isPresent()){
+            throw new TelefonoDuplicadoException(paciente.getTelefono());
+        }
+        if (paciente.getNumeroAfiliado() != null && 
+            pacienteRepository.findByNumeroAfiliado(paciente.getNumeroAfiliado()).isPresent()){
+                throw new NumAfiliadoDuplicadoException(paciente.getNumeroAfiliado());
+            }
+        
         paciente.setRol(Rol.PACIENTE);
         paciente.setActivo(true);
         paciente.setPassword(passwordEncoder.encode(paciente.getPassword())); // Se hashea la Password

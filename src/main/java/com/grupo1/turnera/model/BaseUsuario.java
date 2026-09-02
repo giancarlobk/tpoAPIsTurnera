@@ -33,7 +33,7 @@ public abstract class BaseUsuario {
     @Column(nullable = false)
     private String password;
 
-    @Column(length = 20)
+    @Column(length = 20, unique = true)
     private String telefono;
 
     @Enumerated(EnumType.STRING)

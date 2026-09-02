@@ -23,7 +23,7 @@ public class Paciente extends BaseUsuario {
     @Column(length = 100)
     private String obraSocial;
 
-    @Column(length = 50)
+    @Column(length = 50, unique = true)
     private String numeroAfiliado;
 
     @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true)
