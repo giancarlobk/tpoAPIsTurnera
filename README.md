@@ -41,6 +41,15 @@ Todavía están pendientes:
 
 La definición del producto, el alcance, la arquitectura propuesta y la estimación de esfuerzo se encuentran en la [Propuesta de Producto](docs/Propuesta%20de%20Producto.docx).
 
+### Swagger / OpenAPI
+
+Con la aplicación en ejecución, la documentación interactiva y el contrato OpenAPI están disponibles en:
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+La especificación cubre los endpoints actuales de autenticación, médicos, pacientes y turnos. Los esquemas públicos omiten contraseñas y relaciones internas de persistencia.
+
 ## 🧑‍⚕️ Consulta de médicos
 
 ### `GET /api/doctores`
