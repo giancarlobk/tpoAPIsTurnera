@@ -124,7 +124,7 @@ class DoctorSearchIntegrationTest {
                 .dni(dni)
                 .email(email)
                 .password("hash-no-serializado")
-                .telefono("1122334455")
+                .telefono("11" + dni)
                 .rol(Rol.MEDICO)
                 .activo(activo)
                 .especialidad(especialidad)

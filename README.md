@@ -45,7 +45,7 @@ URL base local: `http://localhost:8080`
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/auth/login` | Autentica un paciente, médico o administrador activo. | `email`, `password` | `200`, `400`, `401` |
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
-| `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201` |
+| `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | `PacienteCreateRequest` | `201`, `400`, `409` |
 | `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
 | `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
 
@@ -77,14 +77,49 @@ La respuesta contiene datos resumidos del profesional y su especialidad. No expo
 
 #### Registro de pacientes
 
-El alta recibe los siguientes campos principales:
+`POST /api/pacientes`
 
-```text
-dni, nombre, apellido, email, password, telefono,
-fechaNacimiento, obraSocial, numeroAfiliado
+El contrato de entrada (`PacienteCreateRequest`) valida DNI, nombre, apellido, email, contraseña y fecha de nacimiento. `telefono`, `obraSocial` y `numeroAfiliado` son opcionales. El servidor asigna el rol `PACIENTE`, activa la cuenta y hashea la contraseña. La respuesta (`PacienteResponse`) no incluye `password` ni relaciones JPA.
+
+Request:
+
+```json
+{
+  "dni": "30111222",
+  "nombre": "Ana",
+  "apellido": "Pérez",
+  "email": "ana.perez@example.com",
+  "password": "ClaveSegura123",
+  "telefono": "1122334455",
+  "fechaNacimiento": "1995-04-18",
+  "obraSocial": "OSDE",
+  "numeroAfiliado": "123456789"
+}
 ```
 
-El servidor asigna el rol `PACIENTE` y activa la cuenta al registrarla.
+Response `201 Created`:
+
+```json
+{
+  "id": 1,
+  "dni": "30111222",
+  "nombre": "Ana",
+  "apellido": "Pérez",
+  "email": "ana.perez@example.com",
+  "telefono": "1122334455",
+  "rol": "PACIENTE",
+  "activo": true,
+  "fechaNacimiento": "1995-04-18",
+  "obraSocial": "OSDE",
+  "numeroAfiliado": "123456789"
+}
+```
+
+| Código | Cuándo |
+| --- | --- |
+| `201` | Paciente persistido |
+| `400` | Datos inválidos (DNI, email, fecha, campos vacíos, etc.) |
+| `409` | DNI o email ya registrados |
 
 #### Turnos y sobreturnos
 
