@@ -27,6 +27,23 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(DoctorNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleDoctorNotFound(
+        DoctorNotFoundException exception, HttpServletRequest request) {
+    
+        return buildResponse(HttpStatus.NOT_FOUND,exception.getMessage(),request.getRequestURI(),Map.of());
+}
+
+    @ExceptionHandler(HorarioInvalidoException.class)
+    public ResponseEntity<ApiErrorResponse> handleHorarioInvalido(HorarioInvalidoException exception,HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST,exception.getMessage(),request.getRequestURI(),Map.of());
+}
+
+    @ExceptionHandler(HorarioOverlapException.class)
+    public ResponseEntity<ApiErrorResponse> handleHorarioOverlap(HorarioOverlapException exception,HttpServletRequest request) {
+        return buildResponse( HttpStatus.CONFLICT,exception.getMessage(), request.getRequestURI(), Map.of());
+}
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(
             MethodArgumentNotValidException exception,
@@ -37,13 +54,10 @@ public class GlobalExceptionHandler {
                 fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage())
         );
 
-        return buildResponse(
-                HttpStatus.BAD_REQUEST,
-                "La solicitud contiene datos inválidos",
-                request.getRequestURI(),
-                fieldErrors
-        );
+        return buildResponse(HttpStatus.BAD_REQUEST,"La solicitud contiene datos inválidos",request.getRequestURI(),fieldErrors);
     }
+
+    
 
     // Metodo errores de datos Duplicados
     @ExceptionHandler({EmailDuplicadoException.class,
