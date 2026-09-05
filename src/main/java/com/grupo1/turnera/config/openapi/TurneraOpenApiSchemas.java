@@ -6,6 +6,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import com.grupo1.turnera.model.enums.DiaSemana;
+import java.time.LocalTime;
 
 public final class TurneraOpenApiSchemas {
 
@@ -72,4 +74,51 @@ public final class TurneraOpenApiSchemas {
             String justificacionSobreturned
     ) {
     }
+    @Schema(
+        name = "HorarioCreateRequest",
+        description = "Datos necesarios para registrar un bloque semanal de atención de un doctor"
+)
+public record HorarioCreateRequest(
+
+        @Schema(example = "LUNES")
+        DiaSemana diaSemana,
+
+        @Schema(example = "09:00")
+        LocalTime horaInicio,
+
+        @Schema(example = "13:00")
+        LocalTime horaFin,
+
+        @Schema(example = "15")
+        Integer duracionTurnoMinutos
+
+) {
+}
+
+@Schema(
+        name = "HorarioResponse",
+        description = "Bloque semanal de atención registrado para un doctor"
+)
+public record HorarioResponse(
+
+        @Schema(example = "1")
+        Long id,
+
+        @Schema(example = "1")
+        Long doctorId,
+
+        @Schema(example = "LUNES")
+        DiaSemana diaSemana,
+
+        @Schema(example = "09:00")
+        LocalTime horaInicio,
+
+        @Schema(example = "13:00")
+        LocalTime horaFin,
+
+        @Schema(example = "15")
+        Integer duracionTurnoMinutos
+
+) {
+}
 }
