@@ -48,6 +48,7 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201` |
 | `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
 | `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
+| `POST` | `/api/doctores/{doctorId}/horarios` | Registra un bloque semanal de atención para un médico. | Día, hora de inicio, hora de fin y duración del turno | `201`, `400`, `404`, `409` |
 
 ### Contratos high level
 
@@ -103,6 +104,56 @@ Los contratos de turnos referencian al doctor y al paciente por identificador e 
 ```
 
 Para un sobreturno, `esSobreturned` debe representar esa condición y `justificacionSobreturned` describe el motivo.
+
+#### Registro de horario de atención
+
+Permite registrar un bloque semanal de atención asociado a un médico existente.
+
+El identificador del médico se envía como parte de la URL:
+
+```http
+POST /api/doctores/1/horarios
+```
+
+Ejemplo de solicitud:
+
+```json
+{
+  "diaSemana": "LUNES",
+  "horaInicio": "09:00",
+  "horaFin": "13:00",
+  "duracionTurnoMinutos": 15
+}
+```
+
+Ejemplo de respuesta exitosa:
+
+```json
+{
+  "id": 1,
+  "doctorId": 1,
+  "diaSemana": "LUNES",
+  "horaInicio": "09:00:00",
+  "horaFin": "13:00:00",
+  "duracionTurnoMinutos": 15
+}
+```
+
+Reglas del horario:
+
+- El día de la semana es obligatorio.
+- La hora de inicio y la hora de fin son obligatorias.
+- La hora de fin debe ser posterior a la hora de inicio.
+- La duración del turno debe ser de 15 minutos.
+- El médico indicado debe existir.
+- El horario no puede superponerse con otro bloque del mismo médico para el mismo día.
+
+Respuestas posibles:
+
+- `201 Created`: el horario fue registrado correctamente.
+- `400 Bad Request`: los datos del horario son inválidos.
+- `404 Not Found`: no existe el médico indicado.
+- `409 Conflict`: el horario se superpone con otro bloque existente.
 
 ## Inicio rápido
 
@@ -176,7 +227,19 @@ Linux o macOS:
 ./mvnw test
 ```
 
-La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc, JPA y H2. También verifica que `/v3/api-docs` y Swagger UI estén disponibles y que la especificación incluya los cinco contratos actuales.
+La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc, JPA y H2.
+
+Para la configuración de horarios de atención se verifican, entre otros casos:
+
+- creación de un horario válido;
+- rechazo cuando la hora de fin es menor o igual a la hora de inicio;
+- rechazo de una duración de turno inválida;
+- rechazo de bloques horarios superpuestos;
+- aceptación de bloques horarios consecutivos;
+- respuesta `404` cuando el médico no existe;
+- respuesta `409` cuando existe una superposición.
+
+También se verifica que `/v3/api-docs` y Swagger UI estén disponibles y que la especificación incluya los contratos públicos de la API.
 
 ## Arquitectura y tecnologías
 
@@ -214,7 +277,7 @@ La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc,
 El MVP prevé incorporar progresivamente:
 
 - consulta y cancelación de turnos;
-- configuración y consulta de disponibilidad;
+- consulta de disponibilidad a partir de los horarios configurados;
 - administración completa de estados;
 - prevención de reservas superpuestas;
 - autenticación basada en tokens y autorización por roles;
