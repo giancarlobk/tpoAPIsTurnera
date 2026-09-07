@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/turnos")
@@ -54,4 +55,12 @@ public class TurnoController {
         Turno resultado = turnoService.crearSobreturno(sobreturno);
         return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
     }
+
+    @GetMapping("/disponibles")
+    public ResponseEntity<List<Turno>> obtenerTurnosDisponibles(
+            @RequestParam(required = false) Long doctorId) {
+        List<Turno> disponibles = turnoService.obtenerDisponibles(doctorId);
+        return ResponseEntity.ok(disponibles);
+    }
+
 }

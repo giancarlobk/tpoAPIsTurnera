@@ -21,9 +21,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -92,5 +92,13 @@ public class TurnoService {
 
     public Turno crearSobreturno(Turno sobreturno) {
         return turnoRepository.save(sobreturno);
+    }
+
+    public List<Turno> obtenerDisponibles(Long doctorId) {
+        if (doctorId != null) {
+            return turnoRepository.findByEstadoAndDoctorId(EstadoTurno.DISPONIBLE, doctorId);
+        }else{
+            return turnoRepository.findByEstado(EstadoTurno.DISPONIBLE);
+        }
     }
 }
