@@ -1,13 +1,12 @@
 package com.grupo1.turnera.config.openapi;
 
 import com.grupo1.turnera.model.enums.EstadoTurno;
+import com.grupo1.turnera.model.enums.DiaSemana;
 import com.grupo1.turnera.model.enums.Rol;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
-import com.grupo1.turnera.model.enums.DiaSemana;
 import java.time.LocalTime;
 
 public final class TurneraOpenApiSchemas {
@@ -75,7 +74,7 @@ public final class TurneraOpenApiSchemas {
             String justificacionSobreturned
     ) {
     }
-      // DTO utilizado para recibir los datos de un nuevo horario de atención
+    // DTO utilizado para recibir los datos de un nuevo horario de atención
     @Schema(
             name = "HorarioCreateRequest",
             description = "Datos necesarios para registrar un bloque semanal de atención de un doctor"
