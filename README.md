@@ -48,6 +48,7 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
 | `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
 | `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
+| `PATCH` | `/api/turnos/{id}/cancelacion` | Cancela un turno y registra la transición. | `usuarioId`, `rol`, `motivo` | `200`, `400`, `403`, `404`, `409` |
 
 ### Contratos high level
 
@@ -143,6 +144,70 @@ Los contratos de turnos referencian al doctor y al paciente por identificador e 
 
 Para un sobreturno, `esSobreturned` debe representar esa condición y `justificacionSobreturned` describe el motivo.
 
+#### Cancelación de turnos
+
+`PATCH /api/turnos/{id}/cancelacion` recibe `CancelacionTurnoRequest` y devuelve `TurnoResponse`.
+El identificador del turno y `usuarioId` deben ser positivos. `rol` es obligatorio y el motivo debe
+contener entre 1 y 1000 caracteres, con al menos un carácter distinto de espacio. Se guarda sin espacios externos.
+
+```http
+PATCH /api/turnos/1/cancelacion
+Content-Type: application/json
+
+{
+  "usuarioId": 2,
+  "rol": "PACIENTE",
+  "motivo": "No puedo asistir"
+}
+```
+
+Solo el paciente asignado o el médico del turno, activos y con el rol correspondiente en la base,
+pueden cancelar. `ADMIN` no está habilitado para esta operación. Los identificadores de pacientes y
+médicos pertenecen a tablas distintas, por lo que se verifica siempre la combinación de id y rol.
+
+| Estado actual | Actor | Estado resultante |
+| --- | --- | --- |
+| `RESERVADO` o `CONFIRMADO` | `PACIENTE` | `CANCELADO_PACIENTE` |
+| `RESERVADO` o `CONFIRMADO` | `MEDICO` | `CANCELADO_MEDICO` |
+| `DISPONIBLE`, `ATENDIDO`, `AUSENTE` o cualquier cancelado | Paciente o médico autorizado | `409`, sin cambios |
+
+Respuesta `200 OK`:
+
+```json
+{
+  "id": 1,
+  "doctor": { "id": 1 },
+  "paciente": { "id": 2 },
+  "fechaHoraInicio": "2026-09-10T10:00:00",
+  "fechaHoraFin": "2026-09-10T10:30:00",
+  "estado": "CANCELADO_PACIENTE",
+  "esSobreturned": false,
+  "justificacionSobreturned": null
+}
+```
+
+Se conservan el horario, las referencias de médico y paciente, los datos del sobreturno y el historial
+anterior. La cancelación no elimina el turno ni lo vuelve a marcar como disponible. Una única transacción
+actualiza el estado y agrega `HistorialEstadoTurno` con estado anterior/nuevo, fecha, usuario, rol y motivo.
+Un bloqueo de escritura por turno serializa las cancelaciones concurrentes: la segunda recibe `409`.
+Si falla la escritura del historial, también se revierte el cambio de estado.
+
+| Código | Motivo |
+| --- | --- |
+| `200` | Cancelación e historial persistidos |
+| `400` | JSON, id, rol desconocido, campos obligatorios o motivo inválidos |
+| `403` | Actor inexistente, inactivo, ajeno al turno, rol inconsistente o `ADMIN` |
+| `404` | Turno inexistente |
+| `409` | Transición inválida, incluida una cancelación repetida |
+
+Los errores usan `ApiErrorResponse` (`timestamp`, `status`, `error`, `message`, `path`, `fieldErrors`).
+Primero se valida la entrada, luego la existencia del turno, el actor y finalmente la transición.
+
+**Límite actual de autenticación:** el login aún no emite tokens ni establece sesión. `usuarioId` y `rol`
+son datos declarados por el cliente; comprobarlos en la base no acredita la identidad del solicitante.
+Antes de exponer este contrato a usuarios no confiables, el actor debe obtenerse de una sesión o token
+verificado. Esta tarea no incorpora Spring Security ni cambia el contrato de login.
+
 ## Inicio rápido
 
 ### Requisitos
@@ -215,7 +280,14 @@ Linux o macOS:
 ./mvnw test
 ```
 
-La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc, JPA y H2. También verifica que `/v3/api-docs` y Swagger UI estén disponibles y que la especificación incluya los cinco contratos actuales.
+La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc, JPA y H2. También verifica que `/v3/api-docs` y Swagger UI estén disponibles y que la especificación incluya los contratos actuales.
+
+Las pruebas de cancelación usan HTTP real en un puerto aleatorio y comprueban persistencia tras el
+commit, conservación del historial, rollback ante fallos y solicitudes concurrentes. Se pueden ejecutar con:
+
+```powershell
+.\mvnw.cmd "-Dtest=TurnoCancelacionServiceTest,TurnoCancelacionIntegrationTest" test
+```
 
 ## Arquitectura y tecnologías
 
@@ -252,7 +324,7 @@ La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc,
 
 El MVP prevé incorporar progresivamente:
 
-- consulta y cancelación de turnos;
+- consulta de turnos con filtros;
 - configuración y consulta de disponibilidad;
 - administración completa de estados;
 - prevención de reservas superpuestas;

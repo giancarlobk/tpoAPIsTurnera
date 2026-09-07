@@ -6,6 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -13,6 +16,31 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(TurnoNoEncontradoException.class)
+    public ResponseEntity<ApiErrorResponse> handleTurnoNoEncontrado(
+            TurnoNoEncontradoException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler(CancelacionNoPermitidaException.class)
+    public ResponseEntity<ApiErrorResponse> handleCancelacionNoPermitida(
+            CancelacionNoPermitidaException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, exception.getMessage(), request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler(TransicionTurnoInvalidaException.class)
+    public ResponseEntity<ApiErrorResponse> handleTransicionInvalida(
+            TransicionTurnoInvalidaException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+            HandlerMethodValidationException.class})
+    public ResponseEntity<ApiErrorResponse> handleSolicitudInvalida(HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "La solicitud contiene datos inválidos",
+                request.getRequestURI(), Map.of());
+    }
 
     @ExceptionHandler(CredencialesInvalidasException.class)
     public ResponseEntity<ApiErrorResponse> handleCredencialesInvalidas(

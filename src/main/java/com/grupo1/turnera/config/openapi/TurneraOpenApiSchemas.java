@@ -30,18 +30,6 @@ public final class TurneraOpenApiSchemas {
     ) {
     }
 
-    @Schema(name = "TurnoResponse", description = "Turno persistido, sin historial ni historia clínica")
-    public record TurnoResponse(
-            Long id,
-            EntityReference doctor,
-            EntityReference paciente,
-            LocalDateTime fechaHoraInicio,
-            LocalDateTime fechaHoraFin,
-            EstadoTurno estado,
-            Boolean esSobreturned,
-            String justificacionSobreturned
-    ) {
-    }
     @Schema(
         name = "HorarioCreateRequest",
         description = "Datos necesarios para registrar un bloque semanal de atención de un doctor"

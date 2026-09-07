@@ -30,10 +30,28 @@ class OpenApiDocumentationIntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/pacientes'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos/reservar'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos/sobreturno'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch").exists())
                 .andExpect(jsonPath("$.components.schemas.PacienteResponse.properties.password").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.PacienteResponse.properties.historiasClinicas").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.TurnoResponse.properties.historialEstados").doesNotExist())
                 .andExpect(jsonPath("$.components.schemas.TurnoResponse.properties.historiaClinica").doesNotExist());
+    }
+
+    @Test
+    void deberiaDocumentarContratoYErroresDeCancelacion() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch.requestBody.content['application/json'].schema['$ref']")
+                        .value("#/components/schemas/CancelacionTurnoRequest"))
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch.responses['200'].content['*/*'].schema['$ref']")
+                        .value("#/components/schemas/TurnoResponse"))
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch.responses['400']").exists())
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch.responses['403']").exists())
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch.responses['404']").exists())
+                .andExpect(jsonPath("$.paths['/api/turnos/{id}/cancelacion'].patch.responses['409']").exists())
+                .andExpect(jsonPath("$.components.schemas.CancelacionTurnoRequest.required")
+                        .value(org.hamcrest.Matchers.containsInAnyOrder("usuarioId", "rol", "motivo")))
+                .andExpect(jsonPath("$.components.schemas.CancelacionTurnoRequest.properties.motivo.maxLength").value(1000));
     }
 
     @Test
