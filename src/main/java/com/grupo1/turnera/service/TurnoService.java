@@ -81,13 +81,25 @@ public class TurnoService {
     }
 
     private Optional<HorarioAtencion> buscarHorario(Doctor doctor, LocalDateTime inicio) {
-        DiaSemana dia = DiaSemana.valueOf(inicio.getDayOfWeek().name());
+        DiaSemana dia = convertirDia(inicio.getDayOfWeek());
         LocalTime hora = inicio.toLocalTime();
         return doctor.getHorariosAtencion().stream()
                 .filter(horario -> horario.getDiaSemana() == dia)
                 .filter(horario -> !hora.isBefore(horario.getHoraInicio()))
                 .filter(horario -> horario.getDuracionTurnoMinutos() != null)
                 .findFirst();
+    }
+
+    private DiaSemana convertirDia(java.time.DayOfWeek dia) {
+        return switch (dia) {
+            case MONDAY -> DiaSemana.LUNES;
+            case TUESDAY -> DiaSemana.MARTES;
+            case WEDNESDAY -> DiaSemana.MIERCOLES;
+            case THURSDAY -> DiaSemana.JUEVES;
+            case FRIDAY -> DiaSemana.VIERNES;
+            case SATURDAY -> DiaSemana.SABADO;
+            case SUNDAY -> DiaSemana.DOMINGO;
+        };
     }
 
     public Turno crearSobreturno(Turno sobreturno) {
@@ -97,8 +109,7 @@ public class TurnoService {
     public List<Turno> obtenerDisponibles(Long doctorId) {
         if (doctorId != null) {
             return turnoRepository.findByEstadoAndDoctorId(EstadoTurno.DISPONIBLE, doctorId);
-        }else{
+        }else
             return turnoRepository.findByEstado(EstadoTurno.DISPONIBLE);
         }
-    }
 }
