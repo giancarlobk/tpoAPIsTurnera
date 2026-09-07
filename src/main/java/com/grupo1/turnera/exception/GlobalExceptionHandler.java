@@ -49,7 +49,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({EmailDuplicadoException.class,
                         DniDuplicadoException.class,
                         NumAfiliadoDuplicadoException.class,
-                        TelefonoDuplicadoException.class})
+                        TelefonoDuplicadoException.class,
+                        MatriculaDuplicadaException.class,
+                        EspecialidadDuplicadaException.class})
 
     public ResponseEntity<ApiErrorResponse> handleDuplicado(
         RuntimeException exception,
