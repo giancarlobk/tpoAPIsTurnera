@@ -1,18 +1,20 @@
 package com.grupo1.turnera.controller;
 
-
-import com.grupo1.turnera.config.openapi.TurneraOpenApiSchemas.TurnoRequest;
-import com.grupo1.turnera.config.openapi.TurneraOpenApiSchemas.TurnoResponse;
-import com.grupo1.turnera.model.Turno;
+import com.grupo1.turnera.dto.turno.*;
+import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.service.TurnoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import com.grupo1.turnera.exception.ApiErrorResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
@@ -20,41 +22,40 @@ import java.util.List;
 @RequestMapping("/api/turnos")
 @RequiredArgsConstructor
 @Tag(name = "Turnos", description = "Reserva de turnos regulares y sobreturnos")
+@ApiResponse(responseCode = "400", description = "Datos inválidos",
+        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
 public class TurnoController {
-
     private final TurnoService turnoService;
 
     @PostMapping("/reservar")
-    @Operation(summary = "Reservar turno")
     @ApiResponse(responseCode = "200", description = "Turno reservado",
             content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
-    public ResponseEntity<Turno> reservarTurno(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = TurnoRequest.class)))
-            @RequestBody Turno turno) {
-        Turno resultado = turnoService.reservarTurno(turno);
-        return ResponseEntity.ok(resultado);
+    @ApiResponse(responseCode = "404", description = "Médico activo no encontrado",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @Operation(summary = "Reservar turno", description = "PACIENTE: la reserva pertenece al principal autenticado.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<TurnoResponse> reservarTurno(@Valid @RequestBody ReservaTurnoRequest request,
+            @AuthenticationPrincipal BaseUsuario actor) {
+        return ResponseEntity.ok(turnoService.reservarTurno(request, actor));
     }
 
     @PostMapping("/sobreturno")
-    @Operation(summary = "Crear sobreturno")
     @ApiResponse(responseCode = "201", description = "Sobreturno creado",
             content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
-    public ResponseEntity<Turno> crearSobreturno(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = TurnoRequest.class)))
-            @RequestBody Turno sobreturno) {
-        Turno resultado = turnoService.crearSobreturno(sobreturno);
-        return ResponseEntity.status(HttpStatus.CREATED).body(resultado);
+    @ApiResponse(responseCode = "404", description = "Médico o paciente activo no encontrado",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @Operation(summary = "Crear sobreturno",
+            description = "MEDICO: solo su agenda. ADMIN: indica el doctor. El paciente es el destinatario del turno.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<TurnoResponse> crearSobreturno(@Valid @RequestBody SobreturnoRequest request,
+            @AuthenticationPrincipal BaseUsuario actor) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(turnoService.crearSobreturno(request, actor));
     }
 
     @GetMapping("/disponibles")
-    public ResponseEntity<List<Turno>> obtenerTurnosDisponibles(
+    @Operation(summary = "Consultar turnos disponibles", description = "Público: solo horarios e identificador del médico.")
+    public ResponseEntity<List<TurnoDisponibleResponse>> obtenerTurnosDisponibles(
             @RequestParam(required = false) Long doctorId) {
-        List<Turno> disponibles = turnoService.obtenerDisponibles(doctorId);
-        return ResponseEntity.ok(disponibles);
+        return ResponseEntity.ok(turnoService.obtenerDisponibles(doctorId));
     }
-
 }
