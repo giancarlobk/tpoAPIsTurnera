@@ -1,6 +1,7 @@
 package com.grupo1.turnera.controller;
 
 import com.grupo1.turnera.dto.turno.ReservaTurnoRequest;
+import com.grupo1.turnera.dto.turno.CambioEstadoTurnoRequest;
 import com.grupo1.turnera.dto.turno.SobreturnoRequest;
 import com.grupo1.turnera.dto.turno.TurnoDisponibleResponse;
 import com.grupo1.turnera.dto.turno.TurnoResponse;
@@ -25,7 +26,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/turnos")
 @RequiredArgsConstructor
-@Tag(name = "Turnos", description = "Reserva de turnos regulares y sobreturnos")
+@Tag(name = "Turnos", description = "Reserva, sobreturnos y cambios de estado")
 @ApiResponse(responseCode = "400", description = "Datos inválidos",
         content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
 public class TurnoController {
@@ -57,6 +58,22 @@ public class TurnoController {
     public ResponseEntity<TurnoResponse> crearSobreturno(@Valid @RequestBody SobreturnoRequest request,
             @AuthenticationPrincipal BaseUsuario actor) {
         return ResponseEntity.status(HttpStatus.CREATED).body(turnoService.crearSobreturno(request, actor));
+    }
+
+    @PatchMapping("/{turnoId}/estado")
+    @ApiResponse(responseCode = "200", description = "Estado actualizado",
+            content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Turno no encontrado",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "Transición de estado no permitida",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @Operation(summary = "Cambiar estado de turno",
+            description = "PACIENTE cancela sus turnos; MEDICO actualiza su agenda; ADMIN puede actualizar cualquier turno.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<TurnoResponse> cambiarEstado(@PathVariable Long turnoId,
+            @Valid @RequestBody CambioEstadoTurnoRequest request,
+            @AuthenticationPrincipal BaseUsuario actor) {
+        return ResponseEntity.ok(turnoService.cambiarEstado(turnoId, request, actor));
     }
 
     @GetMapping("/disponibles")

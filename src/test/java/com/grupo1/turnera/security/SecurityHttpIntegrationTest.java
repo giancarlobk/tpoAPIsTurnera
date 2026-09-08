@@ -134,12 +134,47 @@ class SecurityHttpIntegrationTest {
         assertThat(doctorResponse.statusCode()).isEqualTo(201);
         assertThat(json(doctorResponse).path("doctor").path("id").asLong()).isEqualTo(medico.getId());
         assertThat(json(doctorResponse).path("esSobreturned").asBoolean()).isTrue();
+        var historial = turnos.findByIdWithHistorial(json(doctorResponse).path("id").asLong()).orElseThrow().getHistorialEstados();
+        assertThat(historial).hasSize(1);
+        assertThat(historial.get(0).getMotivo()).isEqualTo("Control adicional");
         var adminRequest = sobreturno();
         adminRequest.put("fechaHoraInicio", "2030-01-01T10:30:00");
         adminRequest.put("fechaHoraFin", "2030-01-01T11:00:00");
         var adminResponse = send("POST", "/api/turnos/sobreturno", adminRequest, adminToken);
         assertThat(adminResponse.statusCode()).isEqualTo(201);
         assertThat(turnos.count()).isEqualTo(2);
+    }
+
+    @Test
+    void sobreturnoRechazaJustificacionInvalidaYPacienteInexistente() throws Exception {
+        String doctorToken = login(medico.getEmail());
+        Map<String, Object> request = sobreturno();
+        request.put("justificacionSobreturned", "   ");
+        assertError(send("POST", "/api/turnos/sobreturno", request, doctorToken), 400, "/api/turnos/sobreturno");
+
+        request = sobreturno();
+        request.put("paciente", Map.of("id", 999999L));
+        assertError(send("POST", "/api/turnos/sobreturno", request, doctorToken), 404, "/api/turnos/sobreturno");
+        assertThat(turnos.count()).isZero();
+    }
+
+    @Test
+    void cambioEstadoActualizaTurnoRegistraHistorialYRechazaSaltoInvalido() throws Exception {
+        String doctorToken = login(medico.getEmail());
+        var creado = send("POST", "/api/turnos/sobreturno", sobreturno(), doctorToken);
+        long turnoId = json(creado).path("id").asLong();
+
+        Map<String, Object> cambio = new HashMap<>();
+        cambio.put("estadoDestino", "CONFIRMADO");
+        cambio.put("motivo", "Paciente confirmado");
+        var confirmado = send("PATCH", "/api/turnos/" + turnoId + "/estado", cambio, doctorToken);
+        assertThat(confirmado.statusCode()).isEqualTo(200);
+        assertThat(json(confirmado).path("estado").asText()).isEqualTo("CONFIRMADO");
+        assertThat(turnos.findByIdWithHistorial(turnoId).orElseThrow().getHistorialEstados()).hasSize(2);
+
+        cambio.put("estadoDestino", "RESERVADO");
+        assertError(send("PATCH", "/api/turnos/" + turnoId + "/estado", cambio, doctorToken),
+                409, "/api/turnos/" + turnoId + "/estado");
     }
 
     @Test

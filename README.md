@@ -52,6 +52,7 @@ URL base local: `http://localhost:8080`
 | `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` |
 | `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409` |
 | `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409` |
+| `PATCH` | `/api/turnos/{turnoId}/estado` | Cambia el estado con autorización e historial. | Estado destino y motivo opcional/obligatorio según transición | `200`, `400`, `401`, `403`, `404`, `409` |
 
 ### Contratos high level
 
@@ -134,6 +135,27 @@ Códigos de respuesta:
 Las reservas usan `ReservaTurnoRequest`: doctor y horario; el paciente se obtiene del principal autenticado. Los sobreturnos usan `SobreturnoRequest`: paciente destinatario, horario y justificación; el médico trabaja sobre su propia agenda y ADMIN debe indicar el doctor.
 
 El servidor asigna `estado=RESERVADO` y `esSobreturned` según la operación. Las respuestas son DTOs sin entidades completas ni información clínica. Los ejemplos vigentes están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
+
+### Cambio de estado de un turno
+
+Endpoint: `PATCH /api/turnos/{turnoId}/estado`. El request usa `CambioEstadoTurnoRequest`:
+
+```json
+{
+  "estadoDestino": "CONFIRMADO",
+  "motivo": "Paciente confirmó la asistencia"
+}
+```
+
+La matriz permitida es:
+
+| Estado actual | Estados destino permitidos |
+| --- | --- |
+| `RESERVADO` | `CONFIRMADO`, `CANCELADO_PACIENTE`, `CANCELADO_MEDICO` |
+| `CONFIRMADO` | `ATENDIDO`, `AUSENTE`, `CANCELADO_PACIENTE`, `CANCELADO_MEDICO` |
+| `DISPONIBLE`, `ATENDIDO`, `AUSENTE`, `CANCELADO_PACIENTE`, `CANCELADO_MEDICO` | Ninguno |
+
+`PACIENTE` solo puede cancelar sus propios turnos como `CANCELADO_PACIENTE`; `MEDICO` puede modificar turnos de su agenda y `ADMIN` cualquier turno. El motivo es obligatorio para `AUSENTE` y cualquier cancelación. Todo cambio responde `200` con `TurnoResponse` y agrega al historial el estado anterior, estado nuevo, fecha, actor, rol y motivo. Devuelve `400` por request inválido, `401` sin JWT, `403` sin permisos, `404` si el turno no existe y `409` si la transición no está en la matriz.
 
 ## Inicio rápido
 
