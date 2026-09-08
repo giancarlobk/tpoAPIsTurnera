@@ -1,6 +1,7 @@
 package com.grupo1.turnera.service;
 
 import com.grupo1.turnera.dto.turno.ReservaTurnoRequest;
+import com.grupo1.turnera.dto.turno.SobreturnoRequest;
 import com.grupo1.turnera.dto.turno.TurnoResponse;
 import com.grupo1.turnera.dto.turno.UsuarioReferencia;
 import com.grupo1.turnera.exception.RecursoNoEncontradoException;
@@ -155,6 +156,67 @@ class TurnoServiceTest {
 
         assertThatThrownBy(() -> turnoService.reservarTurno(reserva(inicio), paciente(2L)))
                 .isInstanceOf(TurnoNoDisponibleException.class);
+    }
+
+    @Test
+    void deberiaCrearSobreturnoConJustificacionEHistorialDelActor() {
+        Doctor doctor = doctorConHorarioLunes9a12();
+        Paciente paciente = paciente(2L);
+        Doctor actor = Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(20, 0));
+
+        when(doctorRepository.findById(1L)).thenReturn(Optional.of(doctor));
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente));
+        when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> {
+            Turno turno = invocation.getArgument(0);
+            turno.setId(101L);
+            return turno;
+        });
+
+        TurnoResponse response = turnoService.crearSobreturno(
+                new SobreturnoRequest(null, new UsuarioReferencia(2L), inicio, inicio.plusMinutes(30), " Control adicional "),
+                actor);
+
+        ArgumentCaptor<Turno> captor = ArgumentCaptor.forClass(Turno.class);
+        verify(turnoRepository).saveAndFlush(captor.capture());
+        Turno turnoGuardado = captor.getValue();
+        assertThat(response.id()).isEqualTo(101L);
+        assertThat(turnoGuardado.getEsSobreturned()).isTrue();
+        assertThat(turnoGuardado.getJustificacionSobreturned()).isEqualTo("Control adicional");
+        assertThat(turnoGuardado.getHistorialEstados()).singleElement()
+                .satisfies(historial -> {
+                    assertThat(historial.getUsuarioIdModificador()).isEqualTo(1L);
+                    assertThat(historial.getRolUsuarioModificador()).isEqualTo(Rol.MEDICO);
+                    assertThat(historial.getMotivo()).isEqualTo("Control adicional");
+                });
+    }
+
+    @Test
+    void deberiaRechazarSobreturnoSinJustificacion() {
+        when(doctorRepository.findById(1L)).thenReturn(Optional.of(doctorConHorarioLunes9a12()));
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
+        Doctor actor = Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> turnoService.crearSobreturno(
+                new SobreturnoRequest(null, new UsuarioReferencia(2L), inicio, inicio.plusMinutes(30), "   "), actor))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("justificación");
+        verify(turnoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void deberiaLanzar404SiElPacienteDelSobreturnoNoExiste() {
+        when(doctorRepository.findById(1L)).thenReturn(Optional.of(doctorConHorarioLunes9a12()));
+        when(pacienteRepository.findById(999L)).thenReturn(Optional.empty());
+        Doctor actor = Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> turnoService.crearSobreturno(
+                new SobreturnoRequest(null, new UsuarioReferencia(999L), inicio, inicio.plusMinutes(30), "Control"), actor))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("Paciente activo no encontrado");
+        verify(turnoRepository, never()).saveAndFlush(any());
     }
 
     private Doctor doctorConHorarioLunes9a12() {
