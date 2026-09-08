@@ -46,6 +46,7 @@ public class OpenApiConfig {
                 operation.getResponses().addApiResponse("401", error("Token ausente, inválido o vencido"));
                 operation.getResponses().addApiResponse("403", error("Rol o identidad sin permiso"));
             }
+            operation.getResponses().addApiResponse("500", error("Error interno inesperado"));
         }));
     }
 
