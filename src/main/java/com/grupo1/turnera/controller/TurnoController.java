@@ -52,6 +52,8 @@ public class TurnoController {
             content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
     @ApiResponse(responseCode = "404", description = "Médico o paciente activo no encontrado",
             content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "403", description = "El rol o la agenda no están autorizados",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     @Operation(summary = "Crear sobreturno",
             description = "MEDICO: solo su agenda. ADMIN: indica el doctor. El paciente es el destinatario del turno.",
             security = @SecurityRequirement(name = "bearerAuth"))

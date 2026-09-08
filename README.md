@@ -132,9 +132,23 @@ Códigos de respuesta:
 
 #### Turnos y sobreturnos
 
-Las reservas usan `ReservaTurnoRequest`: doctor y horario; el paciente se obtiene del principal autenticado. Los sobreturnos usan `SobreturnoRequest`: paciente destinatario, horario y justificación; el médico trabaja sobre su propia agenda y ADMIN debe indicar el doctor.
+Las reservas usan `ReservaTurnoRequest`: doctor y horario; el paciente se obtiene del principal autenticado. Los sobreturnos usan `SobreturnoRequest`: paciente destinatario, horario y justificación obligatoria; el médico trabaja sobre su propia agenda y ADMIN debe indicar el doctor.
 
-El servidor asigna `estado=RESERVADO` y `esSobreturned` según la operación. Las respuestas son DTOs sin entidades completas ni información clínica. Los ejemplos vigentes están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
+Un sobreturno requiere médico y paciente activos, inicio y fin futuros, fin posterior al inicio y una justificación de hasta 2000 caracteres no vacía. Puede ubicarse fuera del horario regular y no se crea para pacientes inactivos. Cada alta asigna `estado=RESERVADO`, `esSobreturned=true` y un registro en el historial con actor, rol, fecha y motivo. Las respuestas son DTOs sin entidades completas ni información clínica.
+
+Ejemplo (`POST /api/turnos/sobreturno`, JWT de `MEDICO` o `ADMIN`):
+
+```json
+{
+  "doctor": {"id": 1},
+  "paciente": {"id": 2},
+  "fechaHoraInicio": "2030-01-01T10:00:00",
+  "fechaHoraFin": "2030-01-01T10:30:00",
+  "justificacionSobreturned": "Control adicional indicado por el profesional"
+}
+```
+
+Responde `201` con `TurnoResponse`. Devuelve `400` si faltan o son inválidos la justificación o las fechas, `401` si falta un JWT válido, `403` si el rol o la agenda no están autorizados y `404` si el médico o paciente no existen o están inactivos. Los ejemplos de autorización están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
 
 ### Cambio de estado de un turno
 
