@@ -1,5 +1,6 @@
 package com.grupo1.turnera.controller;
 
+import com.grupo1.turnera.dto.doctor.DoctorCreateRequest;
 import com.grupo1.turnera.dto.doctor.DoctorSummaryResponse;
 import com.grupo1.turnera.service.DoctorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,6 +13,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +35,19 @@ import java.util.List;
 public class DoctorController {
 
     private final DoctorService doctorService;
+
+    @PostMapping
+    @Operation(summary = "Registrar médico", description = "Crea un médico activo asociado a una especialidad.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Médico registrado",
+                    content = @Content(schema = @Schema(implementation = DoctorSummaryResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+            @ApiResponse(responseCode = "404", description = "Especialidad inexistente"),
+            @ApiResponse(responseCode = "409", description = "DNI, email o matrícula duplicados")
+    })
+    public ResponseEntity<DoctorSummaryResponse> registrar(@Valid @RequestBody DoctorCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(doctorService.registrar(request));
+    }
 
     @GetMapping
     @Operation(summary = "Buscar médicos", description = "Lista médicos activos y permite filtrar por especialidad y nombre.")
