@@ -10,13 +10,13 @@ import com.grupo1.turnera.model.enums.DiaSemana;
 import com.grupo1.turnera.model.enums.EstadoTurno;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.*;
+import com.grupo1.turnera.exception.ArgumentoInvalidoException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -38,8 +38,9 @@ public class TurnoService {
                 .orElseThrow(() -> new AccessDeniedException("Paciente no habilitado"));
         Doctor doctor = doctorRepository.findByIdForUpdate(request.doctor().id())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Médico", request.doctor().id()));
+        
         if (!doctor.isEnabled() || doctor.getRol() != Rol.MEDICO) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Médico activo no encontrado");
+            throw new RecursoNoEncontradoException("Médico", request.doctor().id());
         }
 
         LocalDateTime inicio = request.fechaHoraInicio();
@@ -76,23 +77,21 @@ public class TurnoService {
             doctorId = actor.getId();
         } else {
             if (request.doctor() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El administrador debe indicar el doctor");
+                throw new ArgumentoInvalidoException("El administrador debe indicar el doctor");
             }
             doctorId = request.doctor().id();
         }
         Doctor doctor = doctorActivo(doctorId);
-        Paciente paciente = pacienteRepository.findById(request.paciente().id())
-                .filter(p -> p.isEnabled() && p.getRol() == Rol.PACIENTE)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente activo no encontrado"));
+        Paciente paciente = pacienteRepository.findById(request.paciente().id()).filter(p -> p.isEnabled()&& p.getRol() == Rol.PACIENTE).orElseThrow(() -> new RecursoNoEncontradoException("Paciente",request.paciente().id()));
         if (!request.fechaHoraInicio().isAfter(LocalDateTime.now())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha y hora de inicio deben ser futuras");
+            throw new ArgumentoInvalidoException("La fecha y hora de inicio deben ser futuras");
         }
         if (!request.fechaHoraFin().isAfter(request.fechaHoraInicio())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de fin debe ser posterior al inicio");
+            throw new ArgumentoInvalidoException("La fecha de fin debe ser posterior al inicio");
         }
         String justificacion = request.justificacionSobreturned().trim();
         if (justificacion.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La justificación es obligatoria");
+            throw new ArgumentoInvalidoException("La justificación es obligatoria");
         }
         Turno turno = nuevoTurno(doctor, paciente, request.fechaHoraInicio(), request.fechaHoraFin());
         turno.setEsSobreturned(true);
@@ -195,16 +194,22 @@ public class TurnoService {
     }
 
     private Doctor doctorActivo(Long id) {
-        return doctorRepository.findById(id).filter(d -> d.isEnabled() && d.getRol() == Rol.MEDICO)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Médico activo no encontrado"));
+        return doctorRepository.findById(id).filter(d -> d.isEnabled()&& d.getRol() == Rol.MEDICO)
+            .orElseThrow(() ->new RecursoNoEncontradoException("Médico", id));
     }
 
-    private Turno nuevoTurno(Doctor doctor, Paciente paciente, LocalDateTime inicio, LocalDateTime fin) {
-        if (!fin.isAfter(inicio)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de fin debe ser posterior al inicio");
-        }
-        return Turno.builder().doctor(doctor).paciente(paciente).fechaHoraInicio(inicio).fechaHoraFin(fin)
-                .estado(EstadoTurno.RESERVADO).esSobreturned(false).build();
+    private Turno nuevoTurno(Doctor doctor,Paciente paciente,LocalDateTime inicio,LocalDateTime fin) 
+    { if (!fin.isAfter(inicio)) {
+        throw new ArgumentoInvalidoException("La fecha de fin debe ser posterior al inicio");}
+     
+     return Turno.builder()
+            .doctor(doctor)
+            .paciente(paciente)
+            .fechaHoraInicio(inicio)
+            .fechaHoraFin(fin)
+            .estado(EstadoTurno.RESERVADO)
+            .esSobreturned(false)
+            .build();
     }
 
     private void exigirRol(BaseUsuario actor, Rol... permitidos) {

@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.grupo1.turnera.exception.ArgumentoInvalidoException;
 
 import java.util.Optional;
 
@@ -38,9 +39,9 @@ public class PacienteService {
         String telefono = normalizar(request.telefono());
         String obraSocial = normalizar(request.obraSocial());
         String numeroAfiliado = normalizar(request.numeroAfiliado());
-
+        
         if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña no puede superar 72 bytes UTF-8");
+            throw new ArgumentoInvalidoException("La contraseña no puede superar 72 bytes UTF-8");
         }
         if (usuarioRepository.existsByEmail(email)) {
             throw new EmailDuplicadoException(email);
