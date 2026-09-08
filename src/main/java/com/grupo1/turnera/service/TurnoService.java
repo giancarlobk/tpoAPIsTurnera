@@ -133,16 +133,22 @@ public class TurnoService {
     }
 
     private Doctor doctorActivo(Long id) {
-        return doctorRepository.findById(id).filter(d -> d.isEnabled() && d.getRol() == Rol.MEDICO)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Médico activo no encontrado"));
+        return doctorRepository.findById(id).filter(d -> d.isEnabled()&& d.getRol() == Rol.MEDICO)
+            .orElseThrow(() ->new RecursoNoEncontradoException("Médico", id));
     }
 
-    private Turno nuevoTurno(Doctor doctor, Paciente paciente, LocalDateTime inicio, LocalDateTime fin) {
-        if (!fin.isAfter(inicio)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de fin debe ser posterior al inicio");
-        }
-        return Turno.builder().doctor(doctor).paciente(paciente).fechaHoraInicio(inicio).fechaHoraFin(fin)
-                .estado(EstadoTurno.RESERVADO).esSobreturned(false).build();
+    private Turno nuevoTurno(Doctor doctor,Paciente paciente,LocalDateTime inicio,LocalDateTime fin) 
+    { if (!fin.isAfter(inicio)) {
+        throw new ArgumentoInvalidoException("La fecha de fin debe ser posterior al inicio");}
+     
+     return Turno.builder()
+            .doctor(doctor)
+            .paciente(paciente)
+            .fechaHoraInicio(inicio)
+            .fechaHoraFin(fin)
+            .estado(EstadoTurno.RESERVADO)
+            .esSobreturned(false)
+            .build();
     }
 
     private void exigirRol(BaseUsuario actor, Rol... permitidos) {
