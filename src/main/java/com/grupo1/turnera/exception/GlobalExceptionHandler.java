@@ -142,6 +142,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+        @ExceptionHandler(TransicionEstadoTurnoInvalidaException.class)
+        public ResponseEntity<ApiErrorResponse> handleTransicionInvalida(
+                        TransicionEstadoTurnoInvalidaException exception,
+                        HttpServletRequest request) {
+                return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request.getRequestURI(), Map.of());
+        }
+
 
     private ResponseEntity<ApiErrorResponse> buildResponse(
             HttpStatus status,
