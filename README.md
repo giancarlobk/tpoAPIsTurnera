@@ -131,21 +131,9 @@ Códigos de respuesta:
 
 #### Turnos y sobreturnos
 
-Los contratos de turnos referencian al doctor y al paciente por identificador e incluyen:
+Las reservas usan `ReservaTurnoRequest`: doctor y horario; el paciente se obtiene del principal autenticado. Los sobreturnos usan `SobreturnoRequest`: paciente destinatario, horario y justificación; el médico trabaja sobre su propia agenda y ADMIN debe indicar el doctor.
 
-```json
-{
-  "doctor": { "id": 1 },
-  "paciente": { "id": 2 },
-  "fechaHoraInicio": "2026-09-10T10:00:00",
-  "fechaHoraFin": "2026-09-10T10:30:00",
-  "estado": "RESERVADO",
-  "esSobreturned": false,
-  "justificacionSobreturned": null
-}
-```
-
-Para un sobreturno, `esSobreturned` debe representar esa condición y `justificacionSobreturned` describe el motivo.
+El servidor asigna `estado=RESERVADO` y `esSobreturned` según la operación. Las respuestas son DTOs sin entidades completas ni información clínica. Los ejemplos vigentes están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
 
 ## Inicio rápido
 
