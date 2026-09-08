@@ -83,10 +83,24 @@ public class TurnoService {
         Paciente paciente = pacienteRepository.findById(request.paciente().id())
                 .filter(p -> p.isEnabled() && p.getRol() == Rol.PACIENTE)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente activo no encontrado"));
+        if (!request.fechaHoraInicio().isAfter(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha y hora de inicio deben ser futuras");
+        }
+        if (!request.fechaHoraFin().isAfter(request.fechaHoraInicio())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La fecha de fin debe ser posterior al inicio");
+        }
+        String justificacion = request.justificacionSobreturned().trim();
+        if (justificacion.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La justificación es obligatoria");
+        }
         Turno turno = nuevoTurno(doctor, paciente, request.fechaHoraInicio(), request.fechaHoraFin());
         turno.setEsSobreturned(true);
-        turno.setJustificacionSobreturned(request.justificacionSobreturned().trim());
-        return TurnoResponse.fromEntity(turnoRepository.save(turno));
+        turno.setJustificacionSobreturned(justificacion);
+        turno.getHistorialEstados().add(HistorialEstadoTurno.builder()
+                .turno(turno).estadoAnterior(EstadoTurno.RESERVADO).estadoNuevo(EstadoTurno.RESERVADO)
+                .fechaCambio(LocalDateTime.now()).usuarioIdModificador(actor.getId())
+                .rolUsuarioModificador(actor.getRol()).motivo(justificacion).build());
+        return TurnoResponse.fromEntity(turnoRepository.saveAndFlush(turno));
     }
 
     @Transactional(readOnly = true)
