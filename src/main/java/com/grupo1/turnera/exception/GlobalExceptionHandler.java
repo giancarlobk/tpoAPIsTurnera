@@ -87,7 +87,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({EmailDuplicadoException.class,
                         DniDuplicadoException.class,
                         NumAfiliadoDuplicadoException.class,
-                        TelefonoDuplicadoException.class})
+                        TelefonoDuplicadoException.class,
+                        MatriculaDuplicadaException.class,
+                        EspecialidadDuplicadaException.class})
 
     public ResponseEntity<ApiErrorResponse> handleDuplicado(
         RuntimeException exception,
@@ -100,6 +102,46 @@ public class GlobalExceptionHandler {
                 Map.of()
         );
     }
+    // Metodo errores de recurso no encontrado
+     @ExceptionHandler(RecursoNoEncontradoException.class)
+    public ResponseEntity<ApiErrorResponse> handleRecursoNoEncontrado(
+            RecursoNoEncontradoException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.NOT_FOUND, // 404
+                exception.getMessage(),
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+    // Metodo errores de turno fuera de horario
+        @ExceptionHandler(TurnoNoDisponibleException.class)
+    public ResponseEntity<ApiErrorResponse> handleTurnoNoDisponible(
+            TurnoNoDisponibleException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.CONFLICT, // 409
+                exception.getMessage(),
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+    // Metodo errores de turno fuera de horario
+        @ExceptionHandler(TurnoFueraDeHorarioException.class)
+    public ResponseEntity<ApiErrorResponse> handleTurnoFueraDeHorario(
+            TurnoFueraDeHorarioException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(
+                HttpStatus.BAD_REQUEST, // 400
+                exception.getMessage(),
+                request.getRequestURI(),
+                Map.of()
+        );
+    }
+
 
     private ResponseEntity<ApiErrorResponse> buildResponse(
             HttpStatus status,

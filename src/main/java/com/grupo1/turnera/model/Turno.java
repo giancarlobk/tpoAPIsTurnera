@@ -10,7 +10,10 @@ import java.util.List;
 import com.grupo1.turnera.model.enums.EstadoTurno;
 
 @Entity
-@Table(name = "turnos")
+@Table(name = "turnos", uniqueConstraints =@UniqueConstraint(
+        name = "uk_turno_doctor_inicio",
+        columnNames = {"doctor_id", "fechaHoraInicio"})
+)
 @Getter
 @Setter
 @NoArgsConstructor

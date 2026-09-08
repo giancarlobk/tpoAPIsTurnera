@@ -50,7 +50,7 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
 | `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` |
 | `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` |
-| `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `200`, `400`, `401`, `403`, `404`, `409` |
+| `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409` |
 | `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409` |
 
 ### Contratos high level
@@ -226,6 +226,7 @@ Para Docker, guardar una clave generada de la misma forma como `JWT_SECRET=<valo
 | `/api/auth/**` | Público: registro y login |
 | `POST /api/pacientes` | Público: alias del registro, siempre crea PACIENTE |
 | `GET /api/doctores`, `GET /api/especialidades` | Público: catálogo para elegir profesional |
+| `POST /api/doctores`, `POST /api/especialidades` | ADMIN: altas administrativas |
 | `GET /api/turnos/disponibles` | Público: horarios e id del médico, sin datos de pacientes |
 | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | Público: documentación de la API |
 | `POST /api/turnos/reservar` | PACIENTE: reserva exclusivamente para sí mismo |
@@ -247,8 +248,7 @@ Reserva (`POST /api/turnos/reservar`, JWT de PACIENTE):
 ```json
 {
   "doctor": {"id": 1},
-  "fechaHoraInicio": "2030-01-01T10:00:00",
-  "fechaHoraFin": "2030-01-01T10:30:00"
+  "fechaHoraInicio": "2030-01-01T10:00:00"
 }
 ```
 
@@ -266,7 +266,7 @@ Sobreturno (`POST /api/turnos/sobreturno`, JWT de MEDICO o ADMIN):
 
 El médico puede omitir `doctor`; el administrador debe indicarlo. `paciente` es el destinatario del sobreturno, no la identidad del actor. Ninguna operación confía en `usuarioId` o `rol` enviados por el cliente. Las reservas no aceptan identidad del paciente ni estado: el servidor asigna el principal y `RESERVADO`. Las respuestas son DTOs sin contraseñas ni relaciones clínicas.
 
-Estos contratos reemplazan la recepción de entidades completas de turnos; los clientes deben usar los JSON anteriores. La prevención de superposiciones y el ciclo completo de disponibilidad permanecen en el roadmap.
+Estos contratos reemplazan la recepción de entidades completas de turnos; los clientes deben usar los JSON anteriores. La duración se calcula desde la agenda del médico y las reservas superpuestas se rechazan.
 
 ### Material de referencia
 

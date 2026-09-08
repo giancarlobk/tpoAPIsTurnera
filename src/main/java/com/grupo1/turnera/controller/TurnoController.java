@@ -1,13 +1,16 @@
 package com.grupo1.turnera.controller;
 
-import com.grupo1.turnera.dto.turno.*;
+import com.grupo1.turnera.dto.turno.ReservaTurnoRequest;
+import com.grupo1.turnera.dto.turno.SobreturnoRequest;
+import com.grupo1.turnera.dto.turno.TurnoDisponibleResponse;
+import com.grupo1.turnera.dto.turno.TurnoResponse;
+import com.grupo1.turnera.exception.ApiErrorResponse;
 import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.service.TurnoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import com.grupo1.turnera.exception.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -16,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 @RestController
@@ -28,15 +32,18 @@ public class TurnoController {
     private final TurnoService turnoService;
 
     @PostMapping("/reservar")
-    @ApiResponse(responseCode = "200", description = "Turno reservado",
+    @ApiResponse(responseCode = "201", description = "Turno reservado",
             content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
     @ApiResponse(responseCode = "404", description = "Médico activo no encontrado",
             content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    @Operation(summary = "Reservar turno", description = "PACIENTE: la reserva pertenece al principal autenticado.",
+    @ApiResponse(responseCode = "409", description = "El horario ya está ocupado",
+            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    @Operation(summary = "Reservar turno",
+            description = "PACIENTE: la reserva pertenece al principal autenticado y respeta la agenda del médico.",
             security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<TurnoResponse> reservarTurno(@Valid @RequestBody ReservaTurnoRequest request,
             @AuthenticationPrincipal BaseUsuario actor) {
-        return ResponseEntity.ok(turnoService.reservarTurno(request, actor));
+        return ResponseEntity.status(HttpStatus.CREATED).body(turnoService.reservarTurno(request, actor));
     }
 
     @PostMapping("/sobreturno")

@@ -90,6 +90,18 @@ class SecurityAuthorizationTest {
     }
 
     @Test
+    void soloAdministradorPuedeRegistrarMedicosYEspecialidades() throws Exception {
+        for (String path : new String[]{"/api/doctores", "/api/especialidades"}) {
+            mvc.perform(post(path).with(user("usuario").roles("PACIENTE"))
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(post(path).with(user("admin").roles("ADMIN"))
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{}"))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
     void contratoUserDetailsReflejaRolYEstado() {
         BaseUsuario usuario = Paciente.builder().email("p@example.test").rol(Rol.PACIENTE).activo(false).build();
         org.assertj.core.api.Assertions.assertThat(usuario.getUsername()).isEqualTo("p@example.test");

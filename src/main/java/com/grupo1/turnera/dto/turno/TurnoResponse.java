@@ -2,6 +2,7 @@ package com.grupo1.turnera.dto.turno;
 
 import com.grupo1.turnera.model.Turno;
 import com.grupo1.turnera.model.enums.EstadoTurno;
+
 import java.time.LocalDateTime;
 
 public record TurnoResponse(

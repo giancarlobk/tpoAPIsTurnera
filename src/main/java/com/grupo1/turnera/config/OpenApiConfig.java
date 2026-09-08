@@ -26,7 +26,7 @@ public class OpenApiConfig {
                 .title("Turnero Médico API").version("v1")
                 .description("Registro y login públicos. JWT Bearer para operaciones protegidas. "
                         + "PACIENTE reserva para sí mismo; MEDICO crea sobreturnos en su agenda; "
-                        + "ADMIN crea sobreturnos para cualquier médico y accede a /api/admin/**. "
+                        + "ADMIN crea sobreturnos para cualquier médico, registra médicos y especialidades, y accede a /api/admin/**. "
                         + "Las consultas de médicos, especialidades y disponibilidad son públicas.")
                 .contact(new Contact().name("Grupo 1")))
                 .components(new Components().addSecuritySchemes("bearerAuth", new SecurityScheme()

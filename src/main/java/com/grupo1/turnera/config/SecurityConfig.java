@@ -49,6 +49,7 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/pacientes").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/doctores", "/api/especialidades").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/doctores", "/api/especialidades", "/api/turnos/disponibles").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/turnos/reservar").hasRole("PACIENTE")

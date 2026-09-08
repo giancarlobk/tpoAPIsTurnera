@@ -57,6 +57,9 @@ class SecurityHttpIntegrationTest {
         medico = doctores.saveAndFlush(Doctor.builder().dni("11111111").nombre("Médico").apellido("Prueba")
                 .email("medico@example.test").password(encoder.encode(PASSWORD)).rol(Rol.MEDICO).activo(true)
                 .matriculaNacional("MN-123").especialidad(especialidad).build());
+        medico.getHorariosAtencion().add(HorarioAtencion.builder().doctor(medico).diaSemana(DiaSemana.MARTES)
+                .horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(12, 0)).duracionTurnoMinutos(30).build());
+        medico = doctores.saveAndFlush(medico);
         admin = administradores.saveAndFlush(Administrador.builder().dni("33333333").nombre("Admin").apellido("Prueba")
                 .email("admin@example.test").password(encoder.encode(PASSWORD)).rol(Rol.ADMIN).activo(true).build());
     }
@@ -86,7 +89,7 @@ class SecurityHttpIntegrationTest {
         request.put("estado", "ATENDIDO");
         request.put("historiaClinica", Map.of("id", 1));
         var response = send("POST", "/api/turnos/reservar", request, token);
-        assertThat(response.statusCode()).isEqualTo(200);
+        assertThat(response.statusCode()).isEqualTo(201);
         var body = json(response);
         assertThat(body.path("paciente").path("id").asLong()).isEqualTo(persistido.getId());
         assertThat(body.path("estado").asText()).isEqualTo("RESERVADO");
@@ -131,7 +134,10 @@ class SecurityHttpIntegrationTest {
         assertThat(doctorResponse.statusCode()).isEqualTo(201);
         assertThat(json(doctorResponse).path("doctor").path("id").asLong()).isEqualTo(medico.getId());
         assertThat(json(doctorResponse).path("esSobreturned").asBoolean()).isTrue();
-        var adminResponse = send("POST", "/api/turnos/sobreturno", sobreturno(), adminToken);
+        var adminRequest = sobreturno();
+        adminRequest.put("fechaHoraInicio", "2030-01-01T10:30:00");
+        adminRequest.put("fechaHoraFin", "2030-01-01T11:00:00");
+        var adminResponse = send("POST", "/api/turnos/sobreturno", adminRequest, adminToken);
         assertThat(adminResponse.statusCode()).isEqualTo(201);
         assertThat(turnos.count()).isEqualTo(2);
     }
