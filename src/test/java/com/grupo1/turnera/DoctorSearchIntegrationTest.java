@@ -89,14 +89,31 @@ class DoctorSearchIntegrationTest {
 
     @Test
     void deberiaResponder400ConEspecialidadInvalida() throws Exception {
-        mockMvc.perform(get("/api/doctores").param("especialidadId", "0"))
-                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/doctores")
+                        .param("especialidadId", "0"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.error")
+                       .value("Bad Request"))
+            .andExpect(jsonPath("$.message")
+                       .value("La solicitud contiene datos inválidos"))
+            .andExpect(jsonPath("$.path")
+                       .value("/api/doctores"))
+            .andExpect(jsonPath("$.fieldErrors.especialidadId")
+                       .value("La especialidad debe ser mayor que cero"))
+            .andExpect(jsonPath("$.timestamp").exists());
     }
-
     @Test
     void deberiaResponder400ConNombreVacio() throws Exception {
         mockMvc.perform(get("/api/doctores").param("nombre", "   "))
-                .andExpect(status().isBadRequest());
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.path")
+                       .value("/api/doctores"))
+            .andExpect(jsonPath("$.fieldErrors.nombre")
+                       .value("El nombre no puede estar vacío"))
+            .andExpect(jsonPath("$.timestamp")
+                       .exists());
     }
 
     private Especialidad guardarEspecialidad(String nombre) {
