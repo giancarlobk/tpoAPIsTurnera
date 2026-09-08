@@ -1,6 +1,12 @@
 package com.grupo1.turnera.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,6 +19,38 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(HttpServletRequest request) {
+        return buildResponse(HttpStatus.FORBIDDEN, "No tiene permisos para esta operación",
+                request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthentication(HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNAUTHORIZED, "Email o contraseña incorrectos",
+                request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiErrorResponse> handleResponseStatus(
+            ResponseStatusException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason(),
+                request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleIntegrity(HttpServletRequest request) {
+        return buildResponse(HttpStatus.CONFLICT, "Los datos entran en conflicto con un registro existente",
+                request.getRequestURI(), Map.of());
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class,
+            MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiErrorResponse> handleMalformedRequest(HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "La solicitud contiene datos inválidos",
+                request.getRequestURI(), Map.of());
+    }
 
     @ExceptionHandler(CredencialesInvalidasException.class)
     public ResponseEntity<ApiErrorResponse> handleCredencialesInvalidas(

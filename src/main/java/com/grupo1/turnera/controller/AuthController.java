@@ -1,9 +1,12 @@
 package com.grupo1.turnera.controller;
 
 import com.grupo1.turnera.dto.auth.LoginRequest;
+import com.grupo1.turnera.dto.paciente.PacienteCreateRequest;
+import com.grupo1.turnera.dto.paciente.PacienteResponse;
+import org.springframework.http.HttpStatus;
 import com.grupo1.turnera.dto.auth.LoginResponse;
 import com.grupo1.turnera.exception.ApiErrorResponse;
-import com.grupo1.turnera.service.AuthService;
+import com.grupo1.turnera.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -24,10 +27,24 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Autenticación", description = "Inicio de sesión de usuarios")
 public class AuthController {
 
-    private final AuthService authService;
+    private final AuthenticationService authService;
+
+    @PostMapping("/register")
+    @Operation(summary = "Registrar usuario", description = "Registro público de pacientes con BCrypt; rol PACIENTE asignado por el servidor.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Paciente registrado",
+                    content = @Content(schema = @Schema(implementation = PacienteResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
+            @ApiResponse(responseCode = "409", description = "Datos ya registrados",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public ResponseEntity<PacienteResponse> register(@Valid @RequestBody PacienteCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    }
 
     @PostMapping("/login")
-    @Operation(summary = "Iniciar sesión", description = "Valida las credenciales de un usuario activo.")
+    @Operation(summary = "Iniciar sesión", description = "Valida mediante AuthenticationManager y devuelve un JWT firmado. Usar Authorization: Bearer <token>.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Credenciales válidas",
                     content = @Content(schema = @Schema(implementation = LoginResponse.class))),

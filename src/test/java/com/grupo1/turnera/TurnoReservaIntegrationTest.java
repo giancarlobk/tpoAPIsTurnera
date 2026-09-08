@@ -8,6 +8,7 @@ import com.grupo1.turnera.model.Turno;
 import com.grupo1.turnera.model.enums.DiaSemana;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.TurnoRepository;
+import com.grupo1.turnera.security.JwtUtil;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,10 +47,13 @@ class TurnoReservaIntegrationTest {
     private PasswordEncoder passwordEncoder;
     @Autowired
     private TurnoRepository turnoRepository;
+    @Autowired
+    private JwtUtil jwtUtil;
 
     private Long doctorId;
     private Long pacienteId;
     private LocalDateTime proximoLunes9am;
+    private String token;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +94,7 @@ class TurnoReservaIntegrationTest {
 
         doctorId = doctor.getId();
         pacienteId = paciente.getId();
+        token = jwtUtil.generateToken(paciente);
         LocalDate proximoLunes = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         proximoLunes9am = LocalDateTime.of(proximoLunes, LocalTime.of(9, 0));
     }
@@ -97,12 +102,13 @@ class TurnoReservaIntegrationTest {
     @Test
     void deberiaReservarUnTurnoValidoYPersistirTurnoEHistorial() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, proximoLunes9am)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
-                .andExpect(jsonPath("$.doctorId").value(doctorId))
-                .andExpect(jsonPath("$.pacienteId").value(pacienteId))
+                .andExpect(jsonPath("$.doctor.id").value(doctorId))
+                .andExpect(jsonPath("$.paciente.id").value(pacienteId))
                 .andExpect(jsonPath("$.estado").value("RESERVADO"))
                 .andExpect(jsonPath("$.fechaHoraFin").value(
                         proximoLunes9am.plusMinutes(30).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
@@ -116,22 +122,26 @@ class TurnoReservaIntegrationTest {
     @Test
     void deberiaResponder404SiElDoctorNoExiste() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, 999999L, proximoLunes9am)))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void deberiaResponder404SiElPacienteNoExiste() throws Exception {
+    void deberiaUsarElPacienteAutenticadoAunqueElClienteIntenteEnviarOtroId() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(999999L, doctorId, proximoLunes9am)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.paciente.id").value(pacienteId));
     }
 
     @Test
     void deberiaResponder400ConFechaPasada() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, LocalDateTime.now().minusDays(1))))
                 .andExpect(status().isBadRequest())
@@ -143,6 +153,7 @@ class TurnoReservaIntegrationTest {
         LocalDateTime fueraDeHorario = proximoLunes9am.withHour(20);
 
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, fueraDeHorario)))
                 .andExpect(status().isBadRequest());
@@ -151,6 +162,7 @@ class TurnoReservaIntegrationTest {
     @Test
     void noDeberiaPermitirDosTurnosSuperpuestosParaElMismoMedico() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, proximoLunes9am)))
                 .andExpect(status().isCreated());
@@ -167,12 +179,14 @@ class TurnoReservaIntegrationTest {
 
         // Mismo horario exacto.
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(otroPaciente.getId(), doctorId, proximoLunes9am)))
                 .andExpect(status().isConflict());
 
         // Horario que arranca 15 min después (se solapa con el primero, que dura hasta las 9:30).
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(otroPaciente.getId(), doctorId, proximoLunes9am.plusMinutes(15))))
                 .andExpect(status().isConflict());
@@ -184,10 +198,12 @@ class TurnoReservaIntegrationTest {
         return """
                 {
                   "pacienteId": %d,
-                  "doctorId": %d,
-                  "fechaHoraInicio": "%s"
+                  "doctor": { "id": %d },
+                  "fechaHoraInicio": "%s",
+                  "fechaHoraFin": "%s"
                 }
                 """.formatted(pacienteId, doctorId,
-                fechaHoraInicio.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+                fechaHoraInicio.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                fechaHoraInicio.plusMinutes(30).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
     }
 }

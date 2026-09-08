@@ -4,7 +4,7 @@ import com.grupo1.turnera.dto.auth.LoginRequest;
 import com.grupo1.turnera.dto.auth.LoginResponse;
 import com.grupo1.turnera.exception.CredencialesInvalidasException;
 import com.grupo1.turnera.model.enums.Rol;
-import com.grupo1.turnera.service.AuthService;
+import com.grupo1.turnera.service.AuthenticationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -20,13 +20,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@org.springframework.context.annotation.Import({
+        com.grupo1.turnera.config.SecurityConfig.class, com.grupo1.turnera.config.PasswordConfig.class,
+        com.grupo1.turnera.security.SecurityErrorHandler.class})
 class AuthControllerTest {
+
+    @MockitoBean
+    private com.grupo1.turnera.repository.UsuarioRepository usuarios;
+    @MockitoBean
+    private com.grupo1.turnera.security.JwtUtil jwtUtil;
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockitoBean
-    private AuthService authService;
+    private AuthenticationService authService;
 
     @Test
     void deberiaResponder200SinExponerPassword() throws Exception {
@@ -35,7 +43,7 @@ class AuthControllerTest {
                 "Pablo",
                 "Paciente",
                 "usuario@turnera.com",
-                Rol.PACIENTE
+                Rol.PACIENTE, "jwt-de-prueba", "Bearer", 3600
         );
         when(authService.login(new LoginRequest("usuario@turnera.com", "ClaveSegura123")))
                 .thenReturn(response);
