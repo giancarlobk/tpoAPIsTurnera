@@ -5,6 +5,7 @@ import com.grupo1.turnera.dto.turno.SobreturnoRequest;
 import com.grupo1.turnera.dto.turno.CambioEstadoTurnoRequest;
 import com.grupo1.turnera.dto.turno.TurnoResponse;
 import com.grupo1.turnera.dto.turno.UsuarioReferencia;
+import com.grupo1.turnera.exception.ArgumentoInvalidoException;
 import com.grupo1.turnera.exception.RecursoNoEncontradoException;
 import com.grupo1.turnera.exception.TurnoFueraDeHorarioException;
 import com.grupo1.turnera.exception.TurnoNoDisponibleException;
@@ -202,7 +203,7 @@ class TurnoServiceTest {
 
         assertThatThrownBy(() -> turnoService.crearSobreturno(
                 new SobreturnoRequest(null, new UsuarioReferencia(2L), inicio, inicio.plusMinutes(30), "   "), actor))
-                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .isInstanceOf(ArgumentoInvalidoException.class)
                 .hasMessageContaining("justificación");
         verify(turnoRepository, never()).saveAndFlush(any());
     }
@@ -216,8 +217,8 @@ class TurnoServiceTest {
 
         assertThatThrownBy(() -> turnoService.crearSobreturno(
                 new SobreturnoRequest(null, new UsuarioReferencia(999L), inicio, inicio.plusMinutes(30), "Control"), actor))
-                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
-                .hasMessageContaining("Paciente activo no encontrado");
+                .isInstanceOf(RecursoNoEncontradoException.class)
+                .hasMessageContaining("Paciente con id 999 no encontrado");
         verify(turnoRepository, never()).saveAndFlush(any());
     }
 
