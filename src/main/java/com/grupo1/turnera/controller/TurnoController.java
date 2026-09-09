@@ -76,8 +76,9 @@ public class TurnoController {
             content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "Transición de estado no permitida",
             content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    @Operation(summary = "Cambiar estado de turno",
-            description = "PACIENTE cancela sus turnos; MEDICO actualiza su agenda; ADMIN puede actualizar cualquier turno.",
+    @Operation(summary = "Actualizar parcialmente el estado de un turno",
+            description = "Modifica solo el estado y el motivo del turno. PACIENTE cancela sus turnos; "
+                    + "MEDICO actualiza su agenda; ADMIN puede actualizar cualquier turno.",
             security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<TurnoResponse> cambiarEstado(@PathVariable Long turnoId,
             @Valid @RequestBody CambioEstadoTurnoRequest request,
