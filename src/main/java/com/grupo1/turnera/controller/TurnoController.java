@@ -5,6 +5,7 @@ import com.grupo1.turnera.dto.turno.CambioEstadoTurnoRequest;
 import com.grupo1.turnera.dto.turno.SobreturnoRequest;
 import com.grupo1.turnera.dto.turno.TurnoDisponibleResponse;
 import com.grupo1.turnera.dto.turno.TurnoResponse;
+import com.grupo1.turnera.model.enums.EstadoTurno;
 import com.grupo1.turnera.exception.ApiErrorResponse;
 import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.service.TurnoService;
@@ -16,11 +17,17 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -83,5 +90,19 @@ public class TurnoController {
     public ResponseEntity<List<TurnoDisponibleResponse>> obtenerTurnosDisponibles(
             @RequestParam(required = false) Long doctorId) {
         return ResponseEntity.ok(turnoService.obtenerDisponibles(doctorId));
+    }
+    @GetMapping
+    @Operation(summary = "Buscar turnos por filtros",
+            description = "Requiere autenticación y admite filtros opcionales con paginación.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<Page<TurnoResponse>> buscarTurnos(
+            @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) Long doctorId,
+            @RequestParam(required = false) EstadoTurno estado,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaDesde,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaHasta,
+            @PageableDefault(size = 10, page = 0) Pageable pageable) {
+        return ResponseEntity.ok(turnoService.buscarTurnosConFiltros(
+                pacienteId, doctorId, estado, fechaDesde, fechaHasta, pageable));
     }
 }

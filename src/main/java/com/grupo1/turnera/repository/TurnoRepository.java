@@ -6,6 +6,8 @@ import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -42,4 +44,18 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
     List<Turno> findByEstado(EstadoTurno estado);
     // Obtener turnos por estado y doctor
     List<Turno> findByEstadoAndDoctorId(EstadoTurno estado, Long doctorId);
+
+    @Query("SELECT t FROM Turno t WHERE " +
+           "(:pacienteId IS NULL OR t.paciente.id = :pacienteId) AND " +
+           "(:doctorId IS NULL OR t.doctor.id = :doctorId) AND " +
+           "(:estado IS NULL OR t.estado = :estado) AND " +
+           "(:fechaDesde IS NULL OR t.fechaHoraInicio >= :fechaDesde) AND " +
+           "(:fechaHasta IS NULL OR t.fechaHoraInicio <= :fechaHasta)")
+    Page<Turno> buscarConFiltros(
+            @Param("pacienteId") Long pacienteId,
+            @Param("doctorId") Long doctorId,
+            @Param("estado") EstadoTurno estado,
+            @Param("fechaDesde") LocalDateTime fechaDesde,
+            @Param("fechaHasta") LocalDateTime fechaHasta,
+            Pageable pageable);
 }

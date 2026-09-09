@@ -13,6 +13,8 @@ import com.grupo1.turnera.repository.*;
 import com.grupo1.turnera.exception.ArgumentoInvalidoException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +40,7 @@ public class TurnoService {
                 .orElseThrow(() -> new AccessDeniedException("Paciente no habilitado"));
         Doctor doctor = doctorRepository.findByIdForUpdate(request.doctor().id())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Médico", request.doctor().id()));
-        
+
         if (!doctor.isEnabled() || doctor.getRol() != Rol.MEDICO) {
             throw new RecursoNoEncontradoException("Médico", request.doctor().id());
         }
@@ -120,7 +122,7 @@ public class TurnoService {
                 || estadoNuevo == EstadoTurno.CANCELADO_PACIENTE
                 || estadoNuevo == EstadoTurno.CANCELADO_MEDICO)
                 && (motivo == null || motivo.isEmpty())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw new ArgumentoInvalidoException(
                     "El motivo es obligatorio para ausencias y cancelaciones");
         }
         turno.setEstado(estadoNuevo);
@@ -171,6 +173,15 @@ public class TurnoService {
         return turnos.stream().map(TurnoDisponibleResponse::fromEntity).toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<TurnoResponse> buscarTurnosConFiltros(
+            Long pacienteId, Long doctorId, EstadoTurno estado,
+            LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable) {
+        return turnoRepository.buscarConFiltros(
+                pacienteId, doctorId, estado, fechaDesde, fechaHasta, pageable)
+                .map(TurnoResponse::fromEntity);
+    }
+
     private Optional<HorarioAtencion> buscarHorario(Doctor doctor, LocalDateTime inicio) {
         DiaSemana dia = convertirDia(inicio.getDayOfWeek());
         LocalTime hora = inicio.toLocalTime();
@@ -198,10 +209,10 @@ public class TurnoService {
             .orElseThrow(() ->new RecursoNoEncontradoException("Médico", id));
     }
 
-    private Turno nuevoTurno(Doctor doctor,Paciente paciente,LocalDateTime inicio,LocalDateTime fin) 
+    private Turno nuevoTurno(Doctor doctor,Paciente paciente,LocalDateTime inicio,LocalDateTime fin)
     { if (!fin.isAfter(inicio)) {
         throw new ArgumentoInvalidoException("La fecha de fin debe ser posterior al inicio");}
-     
+
      return Turno.builder()
             .doctor(doctor)
             .paciente(paciente)

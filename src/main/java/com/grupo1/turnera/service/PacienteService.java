@@ -39,7 +39,7 @@ public class PacienteService {
         String telefono = normalizar(request.telefono());
         String obraSocial = normalizar(request.obraSocial());
         String numeroAfiliado = normalizar(request.numeroAfiliado());
-        
+
         if (request.password().getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new ArgumentoInvalidoException("La contraseña no puede superar 72 bytes UTF-8");
         }
