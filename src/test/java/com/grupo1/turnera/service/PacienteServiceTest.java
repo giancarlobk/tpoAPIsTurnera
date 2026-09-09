@@ -9,6 +9,7 @@ import com.grupo1.turnera.exception.TelefonoDuplicadoException;
 import com.grupo1.turnera.model.Paciente;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.PacienteRepository;
+import com.grupo1.turnera.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -41,6 +42,9 @@ class PacienteServiceTest {
 
     @Mock
     private PacienteRepository pacienteRepository;
+
+    @Mock
+    private UsuarioRepository usuarioRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -77,7 +81,7 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarEmailDuplicado() {
-        when(pacienteRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(new Paciente()));
+        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(true);
 
         assertThatThrownBy(() -> pacienteService.registrarPaciente(requestValido()))
                 .isInstanceOf(EmailDuplicadoException.class);
@@ -87,7 +91,7 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarDniDuplicado() {
-        when(pacienteRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.of(new Paciente()));
 
         assertThatThrownBy(() -> pacienteService.registrarPaciente(requestValido()))
@@ -98,7 +102,7 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarTelefonoDuplicadoCuandoSeInformaTelefono() {
-        when(pacienteRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(pacienteRepository.findByTelefono(TELEFONO)).thenReturn(Optional.of(new Paciente()));
 
@@ -110,7 +114,7 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarNumeroAfiliadoDuplicadoCuandoSeInforma() {
-        when(pacienteRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(pacienteRepository.findByTelefono(TELEFONO)).thenReturn(Optional.empty());
         when(pacienteRepository.findByNumeroAfiliado("123456789")).thenReturn(Optional.of(new Paciente()));
@@ -127,7 +131,7 @@ class PacienteServiceTest {
                 DNI, NOMBRE, APELLIDO, EMAIL, PASSWORD,
                 null, FECHA_NACIMIENTO, null, null
         );
-        when(pacienteRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(passwordEncoder.encode(PASSWORD)).thenReturn(PASSWORD_HASH);
         when(pacienteRepository.save(any(Paciente.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -139,7 +143,7 @@ class PacienteServiceTest {
     }
 
     private void givenSinDuplicados() {
-        when(pacienteRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.empty());
+        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(pacienteRepository.findByTelefono(TELEFONO)).thenReturn(Optional.empty());
         when(pacienteRepository.findByNumeroAfiliado("123456789")).thenReturn(Optional.empty());

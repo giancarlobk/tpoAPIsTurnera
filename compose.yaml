@@ -34,6 +34,8 @@ services:
       MYSQL_USER: ${MYSQL_USER:-turnera_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Definir MYSQL_PASSWORD en el archivo .env}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JWT_SECRET: ${JWT_SECRET:?Definir JWT_SECRET en Base64 en el archivo .env}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:

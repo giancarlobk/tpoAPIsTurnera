@@ -14,6 +14,7 @@ API REST para administrar autenticación, profesionales, pacientes y turnos méd
 - [API disponible](#api-disponible)
 - [Inicio rápido](#inicio-rápido)
 - [Documentación interactiva](#documentación-interactiva)
+- [Seguridad y permisos](#seguridad-y-permisos)
 - [Pruebas](#pruebas)
 - [Arquitectura y tecnologías](#arquitectura-y-tecnologías)
 - [Estructura del proyecto](#estructura-del-proyecto)
@@ -43,11 +44,15 @@ URL base local: `http://localhost:8080`
 
 | Método | Endpoint | Descripción | Entrada principal | Respuestas |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/auth/login` | Autentica un paciente, médico o administrador activo. | `email`, `password` | `200`, `400`, `401` |
+| `POST` | `/api/auth/register` | Registra un paciente con BCrypt. | Datos de PacienteCreateRequest | `201`, `400`, `409` |
+| `POST` | `/api/auth/login` | Autentica y emite un JWT para un usuario activo. | `email`, `password` | `200`, `400`, `401` |
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
-| `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
-| `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
+| `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` |
+| `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` |
+| `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409` |
+| `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409` |
+| `PATCH` | `/api/turnos/{turnoId}/estado` | Cambia el estado con autorización e historial. | Estado destino y motivo opcional/obligatorio según transición | `200`, `400`, `401`, `403`, `404`, `409` |
 
 ### Contratos high level
 
@@ -60,7 +65,7 @@ URL base local: `http://localhost:8080`
 }
 ```
 
-Una autenticación exitosa devuelve el identificador, nombre, apellido, email y rol del usuario. La emisión de tokens todavía no forma parte del contrato actual.
+Una autenticación exitosa conserva los datos del usuario y agrega `token` (JWT), `tokenType: Bearer` y `expiresIn` (segundos). El JWT contiene `sub=email`, `userId`, `roles` con prefijo `ROLE_`, `iat` y `exp`; se firma con HS256.
 
 #### Búsqueda de médicos
 
@@ -79,9 +84,9 @@ La respuesta contiene datos resumidos del profesional y su especialidad. No expo
 
 El alta usa un contrato REST (`PacienteCreateRequest` / `PacienteResponse`) desacoplado de la entidad JPA: la entidad nunca se serializa ni se recibe directamente.
 
-`telefono`, `obraSocial` y `numeroAfiliado` son opcionales; el resto de los campos son obligatorios y se validan con Bean Validation.
+`telefono`, `obraSocial` y `numeroAfiliado` son opcionales; el resto de los campos son obligatorios y se validan con Bean Validation. La contraseña admite entre 8 caracteres y 72 bytes UTF-8, límite de BCrypt. El email se normaliza a minúsculas y se verifica sin distinguir mayúsculas entre las tres tablas de usuarios.
 
-Request (`POST /api/pacientes`):
+Request (`POST /api/auth/register`; `POST /api/pacientes` se conserva como alias público):
 
 ```json
 {
@@ -127,21 +132,44 @@ Códigos de respuesta:
 
 #### Turnos y sobreturnos
 
-Los contratos de turnos referencian al doctor y al paciente por identificador e incluyen:
+Las reservas usan `ReservaTurnoRequest`: doctor y horario; el paciente se obtiene del principal autenticado. Los sobreturnos usan `SobreturnoRequest`: paciente destinatario, horario y justificación obligatoria; el médico trabaja sobre su propia agenda y ADMIN debe indicar el doctor.
+
+Un sobreturno requiere médico y paciente activos, inicio y fin futuros, fin posterior al inicio y una justificación de hasta 2000 caracteres no vacía. Puede ubicarse fuera del horario regular y no se crea para pacientes inactivos. Cada alta asigna `estado=RESERVADO`, `esSobreturned=true` y un registro en el historial con actor, rol, fecha y motivo. Las respuestas son DTOs sin entidades completas ni información clínica.
+
+Ejemplo (`POST /api/turnos/sobreturno`, JWT de `MEDICO` o `ADMIN`):
 
 ```json
 {
-  "doctor": { "id": 1 },
-  "paciente": { "id": 2 },
-  "fechaHoraInicio": "2026-09-10T10:00:00",
-  "fechaHoraFin": "2026-09-10T10:30:00",
-  "estado": "RESERVADO",
-  "esSobreturned": false,
-  "justificacionSobreturned": null
+  "doctor": {"id": 1},
+  "paciente": {"id": 2},
+  "fechaHoraInicio": "2030-01-01T10:00:00",
+  "fechaHoraFin": "2030-01-01T10:30:00",
+  "justificacionSobreturned": "Control adicional indicado por el profesional"
 }
 ```
 
-Para un sobreturno, `esSobreturned` debe representar esa condición y `justificacionSobreturned` describe el motivo.
+Responde `201` con `TurnoResponse`. Devuelve `400` si faltan o son inválidos la justificación o las fechas, `401` si falta un JWT válido, `403` si el rol o la agenda no están autorizados y `404` si el médico o paciente no existen o están inactivos. Los ejemplos de autorización están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
+
+### Cambio de estado de un turno
+
+Endpoint: `PATCH /api/turnos/{turnoId}/estado`. El request usa `CambioEstadoTurnoRequest`:
+
+```json
+{
+  "estadoDestino": "CONFIRMADO",
+  "motivo": "Paciente confirmó la asistencia"
+}
+```
+
+La matriz permitida es:
+
+| Estado actual | Estados destino permitidos |
+| --- | --- |
+| `RESERVADO` | `CONFIRMADO`, `CANCELADO_PACIENTE`, `CANCELADO_MEDICO` |
+| `CONFIRMADO` | `ATENDIDO`, `AUSENTE`, `CANCELADO_PACIENTE`, `CANCELADO_MEDICO` |
+| `DISPONIBLE`, `ATENDIDO`, `AUSENTE`, `CANCELADO_PACIENTE`, `CANCELADO_MEDICO` | Ninguno |
+
+`PACIENTE` solo puede cancelar sus propios turnos como `CANCELADO_PACIENTE`; `MEDICO` puede modificar turnos de su agenda y `ADMIN` cualquier turno. El motivo es obligatorio para `AUSENTE` y cualquier cancelación. Todo cambio responde `200` con `TurnoResponse` y agrega al historial el estado anterior, estado nuevo, fecha, actor, rol y motivo. Devuelve `400` por request inválido, `401` sin JWT, `403` sin permisos, `404` si el turno no existe y `409` si la transición no está en la matriz.
 
 ## Inicio rápido
 
@@ -171,7 +199,7 @@ Para un sobreturno, `esSobreturned` debe representar esa condición y `justifica
    cp .env.example .env
    ```
 
-3. Revisar las credenciales de desarrollo en `.env` y levantar los servicios:
+3. Revisar las credenciales de desarrollo y completar `JWT_SECRET` en `.env` según [Seguridad y permisos](#seguridad-y-permisos). Luego levantar los servicios:
 
    ```bash
    docker compose up --build
@@ -201,6 +229,87 @@ Con la aplicación en ejecución:
 
 La especificación cubre todos los endpoints actuales y utiliza esquemas públicos que omiten contraseñas y relaciones internas de persistencia.
 
+## Seguridad y permisos
+
+Se sigue el flujo de Clase 05: `AuthController → AuthenticationService → AuthenticationManager → UserDetailsService → UsuarioRepository`. El registro delega la construcción, validación y persistencia en `PacienteService` dentro de una transacción. `BaseUsuario` implementa `UserDetails` para pacientes, médicos y administradores, sin cambiar la estructura de las tablas. `UsuarioRepository` reúne las consultas de las tres tablas y rechaza identidades ambiguas.
+
+`JwtUtil` emite y valida; `JwtFilter` corre antes de `UsernamePasswordAuthenticationFilter`. Cada request verifica firma, vencimiento, identidad y rol contra la cuenta actual. Una cuenta desactivada o un rol modificado invalidan el uso del token anterior. CSRF se deshabilita porque la API usa únicamente Bearer enviado explícitamente en el header. No usa sesiones, form login, autenticación Basic ni cookies para autenticar.
+
+### Configuración
+
+- `jwt.secret` / `JWT_SECRET`: obligatorio, Base64 de al menos 32 bytes aleatorios. No tiene valor por defecto.
+- `jwt.expiration` / `JWT_EXPIRATION`: duración en milisegundos; por defecto `3600000`, mínimo `1000`.
+- `.env` está ignorado por Git y Docker Compose lo lee. Maven no carga `.env`: usar variables del proceso o propiedades externas.
+
+Para ejecutar desde PowerShell, generar una clave en la sesión y mantenerla mientras se reinicia el backend:
+
+```powershell
+$jwtBytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($jwtBytes)
+$rng.Dispose()
+$env:JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
+$env:JWT_EXPIRATION = "3600000"
+.\mvnw.cmd spring-boot:run
+```
+
+Para Docker, guardar una clave generada de la misma forma como `JWT_SECRET=<valor Base64>` en el archivo local `.env`. No publicar ese archivo. Si cambia la clave, los JWT anteriores dejan de validar. La clave versionada en `src/test/resources/application-test.properties` es pública y exclusiva de pruebas.
+
+### Matriz de acceso
+
+| Método y ruta | Acceso |
+| --- | --- |
+| `/api/auth/**` | Público: registro y login |
+| `POST /api/pacientes` | Público: alias del registro, siempre crea PACIENTE |
+| `GET /api/doctores`, `GET /api/especialidades` | Público: catálogo para elegir profesional |
+| `POST /api/doctores`, `POST /api/especialidades` | ADMIN: altas administrativas |
+| `GET /api/turnos/disponibles` | Público: horarios e id del médico, sin datos de pacientes |
+| `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | Público: documentación de la API |
+| `POST /api/turnos/reservar` | PACIENTE: reserva exclusivamente para sí mismo |
+| `POST /api/turnos/sobreturno` | MEDICO: su propia agenda; ADMIN: cualquier médico activo |
+| `/api/admin/**` | ADMIN; prefijo reservado para futuras operaciones administrativas |
+| Cualquier otra ruta | Requiere autenticación |
+
+Sin token en una operación protegida, o con token inválido/vencido, se devuelve `401`. Un usuario autenticado sin permiso recibe `403`. Ambos usan `ApiErrorResponse`; los errores del filtro no pasan por el controller. Un header Authorization inválido también se rechaza en rutas públicas; para usarlas anónimamente, omitir el header.
+
+### Probar el flujo Bearer
+
+1. Registrar con `POST /api/auth/register` usando el JSON de registro anterior.
+2. Llamar a `POST /api/auth/login` con email y contraseña.
+3. Copiar `token`. En Swagger UI, pulsar **Authorize** y pegar solo el JWT.
+4. En curl/Postman, enviar `Authorization: Bearer <token>`.
+
+Reserva (`POST /api/turnos/reservar`, JWT de PACIENTE):
+
+```json
+{
+  "doctor": {"id": 1},
+  "fechaHoraInicio": "2030-01-01T10:00:00"
+}
+```
+
+Sobreturno (`POST /api/turnos/sobreturno`, JWT de MEDICO o ADMIN):
+
+```json
+{
+  "doctor": {"id": 1},
+  "paciente": {"id": 2},
+  "fechaHoraInicio": "2030-01-01T10:00:00",
+  "fechaHoraFin": "2030-01-01T10:30:00",
+  "justificacionSobreturned": "Control adicional"
+}
+```
+
+El médico puede omitir `doctor`; el administrador debe indicarlo. `paciente` es el destinatario del sobreturno, no la identidad del actor. Ninguna operación confía en `usuarioId` o `rol` enviados por el cliente. Las reservas no aceptan identidad del paciente ni estado: el servidor asigna el principal y `RESERVADO`. Las respuestas son DTOs sin contraseñas ni relaciones clínicas.
+
+Estos contratos reemplazan la recepción de entidades completas de turnos; los clientes deben usar los JSON anteriores. La duración se calcula desde la agenda del médico y las reservas superpuestas se rechazan.
+
+### Material de referencia
+
+Base: `Clase05 - Material/02-PasoAPaso-Autenticacion-Clase05 (1).txt`, `03-ResumenPasosSpringSecurity (1).txt` y el ejemplo `e-commerce-auth` (SecurityConfig, Usuario, AuthenticationService, JwtUtil y JwtFilter).
+
+Se adapta ese flujo a Spring Boot 4.1 / Spring Security 7, usando la API vigente de [JJWT 0.13.0](https://github.com/jwtk/jjwt#installation) y [DaoAuthenticationProvider](https://docs.spring.io/spring-security/reference/servlet/authentication/passwords/dao-authentication-provider.html). Se agregan las exigencias de la [tarjeta SECURITY](https://trello.com/c/TQvx0pnh): stateless explícito, secreto externo, identidad desde el principal y errores JSON.
+
 ## Pruebas
 
 Windows:
@@ -215,7 +324,7 @@ Linux o macOS:
 ./mvnw test
 ```
 
-La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc, JPA y H2. También verifica que `/v3/api-docs` y Swagger UI estén disponibles y que la especificación incluya los cinco contratos actuales.
+La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, ausencia de cookies de sesión y OpenAPI. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
 
 ## Arquitectura y tecnologías
 
@@ -227,7 +336,7 @@ La suite incluye pruebas unitarias, web e integración con Spring Boot, MockMvc,
 | Base de datos | MySQL 8.4; H2 para pruebas |
 | Contratos API | OpenAPI 3.1, Springdoc, Swagger UI |
 | Validación | Jakarta Validation |
-| Seguridad de contraseñas | BCrypt |
+| Seguridad | Spring Security, BCrypt, JJWT 0.13.0 |
 | Build y pruebas | Maven Wrapper, JUnit, MockMvc |
 | Contenedores | Docker, Docker Compose |
 
@@ -256,7 +365,6 @@ El MVP prevé incorporar progresivamente:
 - configuración y consulta de disponibilidad;
 - administración completa de estados;
 - prevención de reservas superpuestas;
-- autenticación basada en tokens y autorización por roles;
 - integración con el frontend.
 
 ## Documentación del producto

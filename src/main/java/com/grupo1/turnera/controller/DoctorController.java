@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.grupo1.turnera.exception.ApiErrorResponse;
 
 import java.util.List;
 
@@ -39,12 +40,11 @@ public class DoctorController {
     @PostMapping
     @Operation(summary = "Registrar médico", description = "Crea un médico activo asociado a una especialidad.")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Médico registrado",
-                    content = @Content(schema = @Schema(implementation = DoctorSummaryResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
-            @ApiResponse(responseCode = "404", description = "Especialidad inexistente"),
-            @ApiResponse(responseCode = "409", description = "DNI, email o matrícula duplicados")
-    })
+        @ApiResponse(responseCode = "201", description = "Médico registrado", content = @Content(schema = @Schema(implementation =DoctorSummaryResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Datos inválidos", content = @Content( schema = @Schema(implementation =ApiErrorResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Especialidad inexistente", content = @Content(schema = @Schema(implementation =ApiErrorResponse.class))),
+        @ApiResponse(responseCode = "409", description = "DNI, email o matrícula duplicados",content = @Content(schema = @Schema(implementation =ApiErrorResponse.class)))
+})
     public ResponseEntity<DoctorSummaryResponse> registrar(@Valid @RequestBody DoctorCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(doctorService.registrar(request));
     }

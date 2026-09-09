@@ -5,5 +5,5 @@ public class RecursoNoEncontradoException extends RuntimeException {
     public RecursoNoEncontradoException(String tipoRecurso, Long id) {
         super(tipoRecurso + " con id " + id + " no encontrado"); // 404
     }
-    
+
 }
