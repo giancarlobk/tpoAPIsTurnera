@@ -152,6 +152,8 @@ Responde `201` con `TurnoResponse`. Devuelve `400` si faltan o son inválidos la
 
 ### Cambio de estado de un turno
 
+Esta operación cumple el requisito de incluir al menos un endpoint `PUT`, `PATCH` o `DELETE`. Se usa `PATCH` porque modifica únicamente el estado y el motivo de un turno existente. Las operaciones de reserva y sobreturno continúan como `POST` porque crean nuevos recursos.
+
 Endpoint: `PATCH /api/turnos/{turnoId}/estado`. El request usa `CambioEstadoTurnoRequest`:
 
 ```json
@@ -324,7 +326,7 @@ Linux o macOS:
 ./mvnw test
 ```
 
-La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, ausencia de cookies de sesión y OpenAPI. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
+La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, transiciones de estado con historial, ausencia de cookies de sesión y el contrato OpenAPI, incluido el endpoint `PATCH`. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
 
 ## Arquitectura y tecnologías
 
