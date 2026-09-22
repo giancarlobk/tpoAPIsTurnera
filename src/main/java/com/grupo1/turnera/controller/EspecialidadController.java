@@ -3,9 +3,9 @@ package com.grupo1.turnera.controller;
 import com.grupo1.turnera.dto.especialidad.EspecialidadCreateRequest;
 import com.grupo1.turnera.dto.especialidad.EspecialidadResponse;
 import com.grupo1.turnera.exception.ApiErrorResponse;
-import com.grupo1.turnera.model.Especialidad;
 import com.grupo1.turnera.service.EspecialidadService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -47,8 +47,14 @@ public class EspecialidadController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Especialidad>> listarEspecialidades() {
-        List<Especialidad> especialidades = especialidadService.obtenerTodas();
+    @Operation(summary = "Listar especialidades", description = "Consulta el catálogo público sin exponer entidades de persistencia.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Especialidades disponibles",
+                    content = @Content(mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = EspecialidadResponse.class))))
+    })
+    public ResponseEntity<List<EspecialidadResponse>> listarEspecialidades() {
+        List<EspecialidadResponse> especialidades = especialidadService.obtenerTodas();
         return ResponseEntity.ok(especialidades);
     }
 }
