@@ -48,7 +48,7 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/auth/login` | Autentica y emite un JWT para un usuario activo. | `email`, `password` | `200`, `400`, `401` |
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
-| `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` |
+| `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` con `List<EspecialidadResponse>` |
 | `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` |
 | `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409` |
 | `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409` |
@@ -79,6 +79,10 @@ GET /api/doctores?especialidadId=1&nombre=ana
 ```
 
 La respuesta contiene datos resumidos del profesional y su especialidad. No expone contraseñas, horarios completos ni relaciones JPA.
+
+#### Especialidades
+
+`GET /api/especialidades` responde `200` con una lista de `EspecialidadResponse` (`id`, `nombre`, `descripcion`). No expone la entidad JPA ni relaciones internas.
 
 #### Registro de pacientes
 

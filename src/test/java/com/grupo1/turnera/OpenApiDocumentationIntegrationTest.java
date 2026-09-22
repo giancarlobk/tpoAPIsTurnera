@@ -28,6 +28,8 @@ class OpenApiDocumentationIntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/auth/login'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/doctores'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/pacientes'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/especialidades'].get.responses['200'].content['application/json'].schema.items['$ref']")
+                        .value("#/components/schemas/EspecialidadResponse"))
                 .andExpect(jsonPath("$.paths['/api/turnos/reservar'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos/sobreturno'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos/{turnoId}/estado'].patch").exists())

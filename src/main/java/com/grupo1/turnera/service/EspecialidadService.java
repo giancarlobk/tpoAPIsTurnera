@@ -16,9 +16,10 @@ public class EspecialidadService {
     @Autowired
     private EspecialidadRepository especialidadRepository;
 
-    public List<Especialidad> obtenerTodas() {
-        //se usa el metodo findAll() de JpaRepository para obtener todas las especialidades
-        return especialidadRepository.findAll();
+    public List<EspecialidadResponse> obtenerTodas() {
+        return especialidadRepository.findAll().stream()
+                .map(EspecialidadResponse::fromEntity)
+                .toList();
     }
 
     public EspecialidadResponse crear(EspecialidadCreateRequest request) {
