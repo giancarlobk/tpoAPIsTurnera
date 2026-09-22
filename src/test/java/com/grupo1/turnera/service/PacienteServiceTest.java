@@ -10,6 +10,7 @@ import com.grupo1.turnera.model.Paciente;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.PacienteRepository;
 import com.grupo1.turnera.repository.UsuarioRepository;
+import com.grupo1.turnera.security.PasswordPolicyValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,6 +49,9 @@ class PacienteServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private PasswordPolicyValidator passwordPolicyValidator;
 
     @InjectMocks
     private PacienteService pacienteService;

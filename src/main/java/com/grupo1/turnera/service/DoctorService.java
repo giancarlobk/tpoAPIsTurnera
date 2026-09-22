@@ -11,6 +11,7 @@ import com.grupo1.turnera.model.Especialidad;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.DoctorRepository;
 import com.grupo1.turnera.repository.EspecialidadRepository;
+import com.grupo1.turnera.security.PasswordPolicyValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class DoctorService {
     private final DoctorRepository doctorRepository;
     private final EspecialidadRepository especialidadRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordPolicyValidator passwordPolicyValidator;
 
     @Transactional(readOnly = true)
     public List<DoctorSummaryResponse> buscar(Long especialidadId, String nombre) {
@@ -38,6 +40,8 @@ public class DoctorService {
 
     @Transactional
     public DoctorSummaryResponse registrar(DoctorCreateRequest request) {
+        passwordPolicyValidator.validateForEncoding(request.password());
+
         String dni = request.dni().trim();
         String email = request.email().trim();
         String matricula = request.matriculaNacional().trim();
