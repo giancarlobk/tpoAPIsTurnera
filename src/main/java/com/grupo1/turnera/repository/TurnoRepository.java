@@ -12,9 +12,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.stereotype.Repository;
 
-@Repository
 public interface TurnoRepository extends JpaRepository<Turno, Long> {
     @Query("select distinct t from Turno t left join fetch t.historialEstados where t.id = :id")
     Optional<Turno> findByIdWithHistorial(@Param("id") Long id);
@@ -28,6 +26,7 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
             FROM Turno t
             WHERE t.doctor.id = :doctorId
               AND t.estado NOT IN (
+                  com.grupo1.turnera.model.enums.EstadoTurno.DISPONIBLE,
                   com.grupo1.turnera.model.enums.EstadoTurno.CANCELADO_PACIENTE,
                   com.grupo1.turnera.model.enums.EstadoTurno.CANCELADO_MEDICO
               )
@@ -39,6 +38,37 @@ public interface TurnoRepository extends JpaRepository<Turno, Long> {
         @Param("fechaHoraInicio") LocalDateTime fechaHoraInicio,
         @Param("fechaHoraFin") LocalDateTime fechaHoraFin
     );
+
+        @Query("""
+            SELECT t
+            FROM Turno t
+            WHERE t.doctor.id = :doctorId
+              AND t.fechaHoraInicio = :fechaHoraInicio
+              AND t.estado = com.grupo1.turnera.model.enums.EstadoTurno.DISPONIBLE
+            """)
+        Optional<Turno> findLegacyDisponible(
+            @Param("doctorId") Long doctorId,
+            @Param("fechaHoraInicio") LocalDateTime fechaHoraInicio
+        );
+
+        @Query("""
+            SELECT t
+            FROM Turno t
+            WHERE t.doctor.id = :doctorId
+              AND t.estado NOT IN (
+              com.grupo1.turnera.model.enums.EstadoTurno.DISPONIBLE,
+              com.grupo1.turnera.model.enums.EstadoTurno.CANCELADO_PACIENTE,
+              com.grupo1.turnera.model.enums.EstadoTurno.CANCELADO_MEDICO
+              )
+              AND t.fechaHoraInicio < :fechaHasta
+              AND t.fechaHoraFin > :fechaDesde
+            ORDER BY t.fechaHoraInicio
+            """)
+        List<Turno> findActivosEnRango(
+            @Param("doctorId") Long doctorId,
+            @Param("fechaDesde") LocalDateTime fechaDesde,
+            @Param("fechaHasta") LocalDateTime fechaHasta
+        );
 
     // Obtener todos los turnos por estado
     List<Turno> findByEstado(EstadoTurno estado);

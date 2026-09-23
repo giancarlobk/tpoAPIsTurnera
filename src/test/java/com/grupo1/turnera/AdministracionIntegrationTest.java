@@ -16,6 +16,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -49,7 +51,8 @@ class AdministracionIntegrationTest {
                 .password(passwordEncoder.encode(ADMIN_PASSWORD)).rol(Rol.ADMIN).activo(true).build());
         entityManager.persist(Paciente.builder()
                 .dni("30000001").nombre("Paciente").apellido("Prueba").email(PACIENTE_EMAIL)
-                .password(passwordEncoder.encode("ClavePaciente123")).rol(Rol.PACIENTE).activo(true).build());
+                .password(passwordEncoder.encode("ClavePaciente123")).rol(Rol.PACIENTE).activo(true)
+                .fechaNacimiento(LocalDate.of(1990, 1, 1)).build());
         entityManager.flush();
     }
 

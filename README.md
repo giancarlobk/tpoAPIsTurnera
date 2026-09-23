@@ -54,7 +54,7 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
 | `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
 | `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` con `List<EspecialidadResponse>` |
-| `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` con `List<TurnoDisponibleResponse>`, `400`, `500` |
+| `GET` | `/api/turnos/disponibles` | Calcula slots desde la agenda y excluye reservas activas. | Query opcional: `doctorId`, `fecha` (`YYYY-MM-DD`) | `200` con `List<TurnoDisponibleResponse>`, `400`, `500` |
 | `GET` | `/api/turnos` | Busca turnos con filtros y paginación. | Query opcional: `pacienteId`, `doctorId`, `estado`, `fechaDesde`, `fechaHasta`, `page`, `size`, `sort` | `200` con `Page<TurnoResponse>`, `400`, `401`, `500` |
 | `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
 | `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
@@ -141,6 +141,8 @@ Códigos de respuesta:
 | `409` | DNI, email, teléfono o número de afiliado ya registrados |
 
 #### Turnos y sobreturnos
+
+La disponibilidad usa el modelo de **slots calculados**: `HorarioAtencion` es la única fuente de verdad y genera intervalos según `duracionTurnoMinutos`. El endpoint de disponibilidad no lee ni crea filas `DISPONIBLE`; excluye turnos activos. La reserva aplica la misma grilla, el lock pesimista del médico y la restricción única `(doctor_id, fechaHoraInicio)`, por lo que dos reservas simultáneas solo confirman una. Las filas `DISPONIBLE` heredadas se ignoran y se limpian al reservar el mismo slot.
 
 Las reservas usan `ReservaTurnoRequest`: doctor y horario; el paciente se obtiene del principal autenticado. Los sobreturnos usan `SobreturnoRequest`: paciente destinatario, horario y justificación obligatoria; el médico trabaja sobre su propia agenda y ADMIN debe indicar el doctor.
 

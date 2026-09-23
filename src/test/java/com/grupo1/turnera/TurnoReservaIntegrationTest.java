@@ -32,6 +32,7 @@ import java.time.temporal.TemporalAdjusters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -132,6 +133,68 @@ class TurnoReservaIntegrationTest {
     }
 
     @Test
+    void disponibilidadSeCalculaDesdeAgendaYDesapareceAlReservar() throws Exception {
+        String fecha = proximoLunes9am.toLocalDate().toString();
+
+        mockMvc.perform(get("/api/turnos/disponibles")
+                        .param("doctorId", doctorId.toString())
+                        .param("fecha", fecha))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(6)))
+                .andExpect(jsonPath("$[0].doctorId").value(doctorId))
+                .andExpect(jsonPath("$[0].fechaHoraInicio").value(
+                        proximoLunes9am.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+
+        mockMvc.perform(post("/api/turnos/reservar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(pacienteId, doctorId, proximoLunes9am)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/turnos/disponibles")
+                        .param("doctorId", doctorId.toString())
+                        .param("fecha", fecha))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(5)))
+                .andExpect(jsonPath("$[0].fechaHoraInicio").value(
+                        proximoLunes9am.plusMinutes(30).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
+    }
+
+    @Test
+    void noPermiteReservarUnaHoraQueNoEsInicioDeSlot() throws Exception {
+        mockMvc.perform(post("/api/turnos/reservar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(pacienteId, doctorId, proximoLunes9am.plusMinutes(15))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void unaFilaDisponibleLegacyNoOcultaNiBloqueaElSlotCalculado() throws Exception {
+        Turno legacy = Turno.builder()
+                .doctor(entityManager.getReference(Doctor.class, doctorId))
+                .fechaHoraInicio(proximoLunes9am)
+                .fechaHoraFin(proximoLunes9am.plusMinutes(30))
+                .estado(com.grupo1.turnera.model.enums.EstadoTurno.DISPONIBLE)
+                .esSobreturned(false)
+                .build();
+        entityManager.persist(legacy);
+        entityManager.flush();
+
+        mockMvc.perform(get("/api/turnos/disponibles")
+                        .param("doctorId", doctorId.toString())
+                        .param("fecha", proximoLunes9am.toLocalDate().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(6)));
+
+        mockMvc.perform(post("/api/turnos/reservar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody(pacienteId, doctorId, proximoLunes9am)))
+                .andExpect(status().isCreated());
+
+        assertThat(turnoRepository.findAll()).extracting(turno -> turno.getEstado())
+                .containsExactly(com.grupo1.turnera.model.enums.EstadoTurno.RESERVADO);
+    }
+
+    @Test
     void deberiaResponder404SiElDoctorNoExiste() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
                         .header("Authorization", "Bearer " + token)
@@ -196,12 +259,12 @@ class TurnoReservaIntegrationTest {
                         .content(requestBody(otroPaciente.getId(), doctorId, proximoLunes9am)))
                 .andExpect(status().isConflict());
 
-        // Horario que arranca 15 min después (se solapa con el primero, que dura hasta las 9:30).
+        // 09:15 no es un slot válido cuando la duración configurada es de 30 minutos.
         mockMvc.perform(post("/api/turnos/reservar")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(otroPaciente.getId(), doctorId, proximoLunes9am.plusMinutes(15))))
-                .andExpect(status().isConflict());
+                .andExpect(status().isBadRequest());
 
         assertThat(turnoRepository.count()).isEqualTo(1);
     }
