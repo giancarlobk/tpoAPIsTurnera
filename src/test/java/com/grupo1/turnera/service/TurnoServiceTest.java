@@ -155,7 +155,7 @@ class TurnoServiceTest {
         when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
         when(turnoRepository.existsSolapamiento(1L, inicio, inicio.plusMinutes(30))).thenReturn(false);
         when(turnoRepository.saveAndFlush(any(Turno.class)))
-                .thenThrow(new DataIntegrityViolationException("uk_turno_doctor_inicio"));
+                .thenThrow(new DataIntegrityViolationException("uk_turno_doctor_inicio_activo"));
 
         assertThatThrownBy(() -> turnoService.reservarTurno(reserva(inicio), paciente(2L)))
                 .isInstanceOf(TurnoNoDisponibleException.class);
@@ -264,6 +264,22 @@ class TurnoServiceTest {
                 new CambioEstadoTurnoRequest(EstadoTurno.CONFIRMADO, null), medicoActor()))
                 .isInstanceOf(TransicionEstadoTurnoInvalidaException.class);
         verify(turnoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cancelarTurnoDeberiaLiberarLaOcupacionActiva() {
+        Turno turno = turno(EstadoTurno.RESERVADO);
+        turno.setOcupacionActiva(true);
+        Paciente pacienteActor = turno.getPaciente();
+        when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        
+        CambioEstadoTurnoRequest request = new CambioEstadoTurnoRequest(EstadoTurno.CANCELADO_PACIENTE,"Paciente no puede asistir");
+        turnoService.cambiarEstado(10L,request,pacienteActor);
+        
+        assertThat(turno.getEstado()).isEqualTo(EstadoTurno.CANCELADO_PACIENTE);
+        assertThat(turno.getOcupacionActiva()).isNull();
+        assertThat(turno.getHistorialEstados()).isNotEmpty();
     }
 
     private Turno turno(EstadoTurno estado) {

@@ -109,7 +109,7 @@ public class TurnoService {
     public TurnoResponse cambiarEstado(Long turnoId, CambioEstadoTurnoRequest request, BaseUsuario actor) {
         exigirRol(actor, Rol.PACIENTE, Rol.MEDICO, Rol.ADMIN);
         Turno turno = turnoRepository.findByIdForUpdate(turnoId)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Turno", turnoId));
+                .orElseThrow(() -> new RecursoNoEncontradoException("T urno", turnoId));
         EstadoTurno estadoAnterior = turno.getEstado();
         EstadoTurno estadoNuevo = request.estadoDestino();
         validarActorSobreTurno(turno, actor, estadoNuevo);
@@ -126,6 +126,10 @@ public class TurnoService {
                     "El motivo es obligatorio para ausencias y cancelaciones");
         }
         turno.setEstado(estadoNuevo);
+        if (estadoNuevo == EstadoTurno.CANCELADO_PACIENTE
+        || estadoNuevo == EstadoTurno.CANCELADO_MEDICO) {
+            turno.setOcupacionActiva(null);
+        }
         turno.getHistorialEstados().add(HistorialEstadoTurno.builder()
                 .turno(turno).estadoAnterior(estadoAnterior).estadoNuevo(estadoNuevo)
                 .fechaCambio(LocalDateTime.now()).usuarioIdModificador(actor.getId())
@@ -209,17 +213,20 @@ public class TurnoService {
             .orElseThrow(() ->new RecursoNoEncontradoException("Médico", id));
     }
 
-    private Turno nuevoTurno(Doctor doctor,Paciente paciente,LocalDateTime inicio,LocalDateTime fin)
-    { if (!fin.isAfter(inicio)) {
-        throw new ArgumentoInvalidoException("La fecha de fin debe ser posterior al inicio");}
+    private Turno nuevoTurno(Doctor doctor,Paciente paciente,LocalDateTime inicio,LocalDateTime fin) {
 
-     return Turno.builder()
+    if (!fin.isAfter(inicio)) {
+        throw new ArgumentoInvalidoException("La fecha de fin debe ser posterior al inicio");
+    }
+
+    return Turno.builder()
             .doctor(doctor)
             .paciente(paciente)
             .fechaHoraInicio(inicio)
             .fechaHoraFin(fin)
             .estado(EstadoTurno.RESERVADO)
             .esSobreturned(false)
+            .ocupacionActiva(true)
             .build();
     }
 
