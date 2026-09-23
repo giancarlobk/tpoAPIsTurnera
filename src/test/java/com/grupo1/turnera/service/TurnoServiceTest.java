@@ -266,6 +266,22 @@ class TurnoServiceTest {
         verify(turnoRepository, never()).saveAndFlush(any());
     }
 
+    @Test
+    void cancelarTurnoDeberiaLiberarLaOcupacionActiva() {
+        Turno turno = turno(EstadoTurno.RESERVADO);
+        turno.setOcupacionActiva(true);
+        Paciente pacienteActor = turno.getPaciente();
+        when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        
+        CambioEstadoTurnoRequest request = new CambioEstadoTurnoRequest(EstadoTurno.CANCELADO_PACIENTE,"Paciente no puede asistir");
+        turnoService.cambiarEstado(10L,request,pacienteActor);
+        
+        assertThat(turno.getEstado()).isEqualTo(EstadoTurno.CANCELADO_PACIENTE);
+        assertThat(turno.getOcupacionActiva()).isNull();
+        assertThat(turno.getHistorialEstados()).isNotEmpty();
+    }
+
     private Turno turno(EstadoTurno estado) {
         return Turno.builder().id(10L).doctor(doctorConHorarioLunes9a12())
                 .paciente(paciente(2L)).fechaHoraInicio(proximoLunesA(LocalTime.of(9, 0)))
