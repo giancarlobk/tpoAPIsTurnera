@@ -159,6 +159,58 @@ class SecurityHttpIntegrationTest {
     }
 
     @Test
+    void sobreturnoEnElMismoHorarioResponde409() throws Exception {
+        String doctorToken = login(medico.getEmail());
+        assertThat(send("POST", "/api/turnos/sobreturno", sobreturno(), doctorToken).statusCode()).isEqualTo(201);
+        assertError(send("POST", "/api/turnos/sobreturno", sobreturno(), doctorToken),
+                409, "/api/turnos/sobreturno");
+    }
+
+    @Test
+    void busquedaYDisponibilidadRespondenConLosDtosDocumentados() throws Exception {
+        String doctorToken = login(medico.getEmail());
+        assertThat(send("POST", "/api/turnos/sobreturno", sobreturno(), doctorToken).statusCode()).isEqualTo(201);
+
+        var busqueda = send("GET", "/api/turnos?page=0&size=5", null, doctorToken);
+        assertThat(busqueda.statusCode()).isEqualTo(200);
+        var pagina = json(busqueda);
+        assertThat(pagina.path("content").isArray()).isTrue();
+        assertThat(pagina.path("content").size()).isEqualTo(1);
+        assertThat(pagina.path("content").get(0).path("doctor").path("id").asLong()).isEqualTo(medico.getId());
+        assertThat(pagina.path("content").get(0).has("historialEstados")).isFalse();
+        assertThat(pagina.path("pageable").path("pageNumber").asInt()).isZero();
+        assertThat(pagina.path("pageable").path("pageSize").asInt()).isEqualTo(5);
+        assertThat(pagina.path("sort").path("sorted").isBoolean()).isTrue();
+        assertThat(pagina.path("totalElements").asLong()).isEqualTo(1);
+        assertThat(pagina.path("totalPages").asInt()).isEqualTo(1);
+        assertThat(pagina.path("number").asInt()).isZero();
+        assertThat(pagina.path("size").asInt()).isEqualTo(5);
+        var contrato = json(send("GET", "/v3/api-docs", null, null));
+        assertThat(pagina.propertyNames()).containsExactlyInAnyOrderElementsOf(
+                contrato.at("/components/schemas/TurnoPageResponse/properties").propertyNames());
+        assertThat(pagina.path("pageable").propertyNames()).containsExactlyInAnyOrderElementsOf(
+                contrato.at("/components/schemas/PageableInfo/properties").propertyNames());
+        assertThat(pagina.path("content").get(0).propertyNames()).containsExactlyInAnyOrderElementsOf(
+                contrato.at("/components/schemas/TurnoResponse/properties").propertyNames());
+        assertError(send("GET", "/api/turnos?estado=INVALIDO", null, doctorToken), 400, "/api/turnos");
+        assertError(send("GET", "/api/turnos", null, null), 401, "/api/turnos");
+
+        turnos.saveAndFlush(Turno.builder().doctor(medico).estado(EstadoTurno.DISPONIBLE)
+                .fechaHoraInicio(LocalDateTime.of(2030, 1, 1, 11, 0))
+                .fechaHoraFin(LocalDateTime.of(2030, 1, 1, 11, 30)).build());
+        var disponibles = send("GET", "/api/turnos/disponibles", null, null);
+        assertThat(disponibles.statusCode()).isEqualTo(200);
+        assertThat(json(disponibles).isArray()).isTrue();
+        assertThat(json(disponibles).size()).isEqualTo(1);
+        assertThat(json(disponibles).get(0).path("doctor").path("id").asLong()).isEqualTo(medico.getId());
+        assertThat(json(disponibles).get(0).propertyNames()).containsExactlyInAnyOrderElementsOf(
+                contrato.at("/components/schemas/TurnoDisponibleResponse/properties").propertyNames());
+        assertThat(disponibles.body()).doesNotContain("paciente", "historiaClinica", "password");
+        assertError(send("GET", "/api/turnos/disponibles?doctorId=invalido", null, null),
+                400, "/api/turnos/disponibles");
+    }
+
+    @Test
     void cambioEstadoActualizaTurnoRegistraHistorialYRechazaSaltoInvalido() throws Exception {
         String doctorToken = login(medico.getEmail());
         var creado = send("POST", "/api/turnos/sobreturno", sobreturno(), doctorToken);
