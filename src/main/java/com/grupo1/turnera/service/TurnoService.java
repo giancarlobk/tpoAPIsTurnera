@@ -20,8 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -57,6 +59,12 @@ public class TurnoService {
         if (turnoRepository.existsSolapamiento(doctor.getId(), inicio, fin)) {
             throw new TurnoNoDisponibleException(doctor.getId(), inicio);
         }
+
+        turnoRepository.findLegacyDisponible(doctor.getId(), inicio)
+                .ifPresent(legacy -> {
+                    turnoRepository.delete(legacy);
+                    turnoRepository.flush();
+                });
 
         Turno turno = nuevoTurno(doctor, paciente, inicio, fin);
         turno.getHistorialEstados().add(HistorialEstadoTurno.builder()
@@ -172,11 +180,47 @@ public class TurnoService {
     }
 
     @Transactional(readOnly = true)
-    public List<TurnoDisponibleResponse> obtenerDisponibles(Long doctorId) {
-        List<Turno> turnos = doctorId == null
-                ? turnoRepository.findByEstado(EstadoTurno.DISPONIBLE)
-                : turnoRepository.findByEstadoAndDoctorId(EstadoTurno.DISPONIBLE, doctorId);
-        return turnos.stream().map(TurnoDisponibleResponse::fromEntity).toList();
+    public List<TurnoDisponibleResponse> obtenerDisponibles(Long doctorId, LocalDate fecha) {
+        LocalDate desde = fecha == null ? LocalDate.now() : fecha;
+        LocalDate hasta = fecha == null ? desde.plusDays(30) : desde.plusDays(1);
+        LocalDateTime ahora = LocalDateTime.now();
+        List<Doctor> doctores = doctorId == null
+                ? doctorRepository.findAll()
+                : doctorRepository.findById(doctorId).map(List::of).orElse(List.of());
+        List<TurnoDisponibleResponse> disponibles = new ArrayList<>();
+
+        for (Doctor doctor : doctores) {
+            if (!doctor.isEnabled() || doctor.getRol() != Rol.MEDICO) {
+                continue;
+            }
+            List<Turno> ocupados = turnoRepository.findActivosEnRango(
+                    doctor.getId(), desde.atStartOfDay(), hasta.atStartOfDay());
+            for (LocalDate dia = desde; dia.isBefore(hasta); dia = dia.plusDays(1)) {
+                for (HorarioAtencion horario : doctor.getHorariosAtencion()) {
+                    if (horario.getDiaSemana() != convertirDia(dia.getDayOfWeek())
+                            || !franjaValida(horario)) {
+                        continue;
+                    }
+                    for (LocalTime hora = horario.getHoraInicio();
+                         !hora.plusMinutes(horario.getDuracionTurnoMinutos()).isAfter(horario.getHoraFin());
+                         hora = hora.plusMinutes(horario.getDuracionTurnoMinutos())) {
+                        LocalDateTime inicio = LocalDateTime.of(dia, hora);
+                        LocalDateTime fin = inicio.plusMinutes(horario.getDuracionTurnoMinutos());
+                        if (inicio.isBefore(ahora) || tieneSolapamiento(ocupados, inicio, fin)) {
+                            continue;
+                        }
+                        disponibles.add(new TurnoDisponibleResponse(
+                                null, new UsuarioReferencia(doctor.getId()), inicio, fin));
+                    }
+                }
+            }
+        }
+        return disponibles;
+    }
+
+    private boolean tieneSolapamiento(List<Turno> ocupados, LocalDateTime inicio, LocalDateTime fin) {
+        return ocupados.stream().anyMatch(turno ->
+                turno.getFechaHoraInicio().isBefore(fin) && turno.getFechaHoraFin().isAfter(inicio));
     }
 
     @Transactional(readOnly = true)

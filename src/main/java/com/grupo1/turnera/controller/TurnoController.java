@@ -30,6 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -96,8 +97,9 @@ public class TurnoController {
                     array = @ArraySchema(schema = @Schema(implementation = TurnoDisponibleResponse.class))))
     @Operation(summary = "Consultar turnos disponibles", description = "Público: solo horarios e identificador del médico.")
     public ResponseEntity<List<TurnoDisponibleResponse>> obtenerTurnosDisponibles(
-            @RequestParam(required = false) Long doctorId) {
-        return ResponseEntity.ok(turnoService.obtenerDisponibles(doctorId));
+                        @RequestParam(required = false) Long doctorId,
+                        @RequestParam(required = false) LocalDate fecha) {
+                return ResponseEntity.ok(turnoService.obtenerDisponibles(doctorId, fecha));
     }
     @GetMapping
     @ApiResponse(responseCode = "200", description = "Página de turnos filtrados",
