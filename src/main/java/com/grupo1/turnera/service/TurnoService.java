@@ -19,11 +19,12 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+
 
 @Service
 @RequiredArgsConstructor
@@ -52,9 +53,7 @@ public class TurnoService {
         HorarioAtencion horario = buscarHorario(doctor, inicio)
                 .orElseThrow(() -> new TurnoFueraDeHorarioException(doctor.getId(), inicio.toString()));
         LocalDateTime fin = inicio.plusMinutes(horario.getDuracionTurnoMinutos());
-        if (fin.toLocalTime().isAfter(horario.getHoraFin())) {
-            throw new TurnoFueraDeHorarioException(doctor.getId(), inicio.toString());
-        }
+        
         if (turnoRepository.existsSolapamiento(doctor.getId(), inicio, fin)) {
             throw new TurnoNoDisponibleException(doctor.getId(), inicio);
         }
@@ -196,15 +195,98 @@ public class TurnoService {
                 .map(TurnoResponse::fromEntity);
     }
 
-    private Optional<HorarioAtencion> buscarHorario(Doctor doctor, LocalDateTime inicio) {
-        DiaSemana dia = convertirDia(inicio.getDayOfWeek());
-        LocalTime hora = inicio.toLocalTime();
-        return doctor.getHorariosAtencion().stream()
-                .filter(horario -> horario.getDiaSemana() == dia)
-                .filter(horario -> !hora.isBefore(horario.getHoraInicio()))
-                .filter(horario -> horario.getDuracionTurnoMinutos() != null)
-                .findFirst();
+    private Optional<HorarioAtencion> buscarHorario(Doctor doctor,LocalDateTime inicio) {
+
+    DiaSemana dia = convertirDia(inicio.getDayOfWeek());
+
+    return doctor.getHorariosAtencion()
+            .stream()
+
+            // Debe corresponder al mismo día de la semana.
+            .filter(horario ->horario.getDiaSemana() == dia)
+
+            // La configuración de la franja debe ser válida.
+            .filter(this::franjaValida)
+
+            // El turno debe entrar completamente
+            // dentro de ESA franja.
+            .filter(horario -> turnoDentroDeFranja(horario,inicio))
+
+            // El inicio debe coincidir con la grilla.
+            .filter(horario ->inicioAlineadoConGrilla(horario,inicio)).findFirst();
     }
+
+    private boolean franjaValida(HorarioAtencion horario) {
+
+    if (horario.getHoraInicio() == null
+            || horario.getHoraFin() == null
+            || horario.getDuracionTurnoMinutos() == null) {
+
+        return false;
+    }
+
+    /*
+     * La duración siempre tiene que ser positiva.
+     */
+    if (horario.getDuracionTurnoMinutos() <= 0) {
+        return false;
+    }
+
+    /*
+     * Decisión tomada para este sistema:
+     *
+     * NO se permiten franjas que crucen medianoche.
+     *
+     * Por ejemplo:
+     * 23:45 - 00:30
+     *
+     * se considera una configuración inválida.
+     */
+    return horario.getHoraFin().isAfter(horario.getHoraInicio());
+    }
+    private boolean turnoDentroDeFranja(HorarioAtencion horario,LocalDateTime inicioTurno) {
+
+    LocalDateTime inicioFranja =LocalDateTime.of(inicioTurno.toLocalDate(),horario.getHoraInicio());
+
+    LocalDateTime finFranja = LocalDateTime.of(inicioTurno.toLocalDate(),horario.getHoraFin());
+
+    LocalDateTime finTurno =inicioTurno.plusMinutes(horario.getDuracionTurnoMinutos());
+
+    /*
+     * Debe cumplirse:
+     *
+     * inicio >= inicioFranja
+     * fin    <= finFranja
+     */
+    return !inicioTurno.isBefore(inicioFranja)
+            && !finTurno.isAfter(finFranja);
+    }
+
+    private boolean inicioAlineadoConGrilla(HorarioAtencion horario,LocalDateTime inicioTurno) {
+
+    LocalDateTime inicioFranja =LocalDateTime.of(inicioTurno.toLocalDate(),horario.getHoraInicio());
+
+    long minutosDesdeInicio = Duration.between(inicioFranja,inicioTurno).toMinutes();
+
+    int duracion = horario.getDuracionTurnoMinutos();
+
+    /*
+     * Ejemplo:
+     *
+     * franja 09:00
+     * duración 30
+     *
+     * válidos:
+     * 09:00
+     * 09:30
+     * 10:00
+     *
+     * inválido:
+     * 09:07
+     */
+    return minutosDesdeInicio >= 0
+            && minutosDesdeInicio % duracion == 0;
+}
 
     private DiaSemana convertirDia(java.time.DayOfWeek dia) {
         return switch (dia) {

@@ -83,6 +83,15 @@ class TurnoReservaIntegrationTest {
                 .build();
         entityManager.persist(horario);
 
+        HorarioAtencion horarioTarde =HorarioAtencion.builder()
+                .doctor(doctor)
+                .diaSemana(DiaSemana.LUNES)
+                .horaInicio(LocalTime.of(14, 0))
+                .horaFin(LocalTime.of(18, 0))
+                .duracionTurnoMinutos(30)
+                .build();
+        entityManager.persist(horarioTarde);
+
         Paciente paciente = Paciente.builder()
                 .nombre("Ana").apellido("Perez").dni("30111222")
                 .email("ana.perez@turnera.com")
@@ -197,7 +206,7 @@ class TurnoReservaIntegrationTest {
         assertThat(turnoRepository.count()).isEqualTo(1);
     }
     @Test
-void deberiaLiberarHorarioCanceladoYPermitirNuevaReserva()
+    void deberiaLiberarHorarioCanceladoYPermitirNuevaReserva()
         throws Exception {
 
     // ======================================================
@@ -336,6 +345,134 @@ void deberiaLiberarHorarioCanceladoYPermitirNuevaReserva()
     assertThat(
             turnosActivos
     ).isEqualTo(1);
+}
+    @Test
+    void deberiaAceptarReservaEnLaSegundaFranja()
+        throws Exception {
+
+    LocalDateTime inicio =proximoLunes9am.withHour(14).withMinute(0);
+            mockMvc.perform(post("/api/turnos/reservar").header("Authorization","Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                    requestBody(
+                                            pacienteId,
+                                            doctorId,
+                                            inicio
+                                    )
+                            )
+            )
+            .andExpect(
+                    status().isCreated()
+            )
+            .andExpect(
+                    jsonPath("$.fechaHoraInicio")
+                            .value(
+                                    inicio.format(
+                                            DateTimeFormatter
+                                                    .ISO_LOCAL_DATE_TIME
+                                    )
+                            )
+            );
+        }
+
+    @Test
+    void deberiaResponder400ConInicioDesalineado()
+        throws Exception {
+
+    LocalDateTime inicio =
+            proximoLunes9am
+                    .withMinute(7);
+
+    mockMvc.perform(
+                    post("/api/turnos/reservar")
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + token
+                            )
+                            .contentType(
+                                    MediaType.APPLICATION_JSON
+                            )
+                            .content(
+                                    requestBody(
+                                            pacienteId,
+                                            doctorId,
+                                            inicio
+                                    )
+                            )
+            )
+            .andExpect(
+                    status().isBadRequest()
+            );
+}
+    @Test
+    void deberiaAceptarUltimoSlotExacto()
+        throws Exception {
+
+    LocalDateTime inicio =
+            proximoLunes9am
+                    .withHour(11)
+                    .withMinute(30);
+
+    mockMvc.perform(
+                    post("/api/turnos/reservar")
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + token
+                            )
+                            .contentType(
+                                    MediaType.APPLICATION_JSON
+                            )
+                            .content(
+                                    requestBody(
+                                            pacienteId,
+                                            doctorId,
+                                            inicio
+                                    )
+                            )
+            )
+            .andExpect(
+                    status().isCreated()
+            )
+            .andExpect(
+                    jsonPath("$.fechaHoraFin")
+                            .value(
+                                    inicio
+                                            .plusMinutes(30)
+                                            .format(
+                                                    DateTimeFormatter
+                                                            .ISO_LOCAL_DATE_TIME
+                                            )
+                            )
+            );
+}
+    @Test
+    void deberiaResponder400SiElTurnoTerminaUnMinutoFuera()
+        throws Exception {
+
+    LocalDateTime inicio =
+            proximoLunes9am
+                    .withHour(11)
+                    .withMinute(31);
+
+    mockMvc.perform(
+                    post("/api/turnos/reservar")
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + token
+                            )
+                            .contentType(
+                                    MediaType.APPLICATION_JSON
+                            )
+                            .content(
+                                    requestBody(
+                                            pacienteId,
+                                            doctorId,
+                                            inicio
+                                    )
+                            )
+            )
+            .andExpect(
+                    status().isBadRequest()
+            );
 }
 
     private String requestBody(Long pacienteId, Long doctorId, LocalDateTime fechaHoraInicio) {
