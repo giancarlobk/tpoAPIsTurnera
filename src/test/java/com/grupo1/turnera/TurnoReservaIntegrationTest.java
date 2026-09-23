@@ -83,6 +83,15 @@ class TurnoReservaIntegrationTest {
                 .build();
         entityManager.persist(horario);
 
+        HorarioAtencion horarioTarde =HorarioAtencion.builder()
+                .doctor(doctor)
+                .diaSemana(DiaSemana.LUNES)
+                .horaInicio(LocalTime.of(14, 0))
+                .horaFin(LocalTime.of(18, 0))
+                .duracionTurnoMinutos(30)
+                .build();
+        entityManager.persist(horarioTarde);
+
         Paciente paciente = Paciente.builder()
                 .nombre("Ana").apellido("Perez").dni("30111222")
                 .email("ana.perez@turnera.com")
