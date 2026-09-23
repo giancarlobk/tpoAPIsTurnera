@@ -1,10 +1,10 @@
 package com.grupo1.turnera.config;
 
 import com.grupo1.turnera.repository.UsuarioRepository;
-import jakarta.servlet.DispatcherType;
 import com.grupo1.turnera.security.JwtFilter;
 import com.grupo1.turnera.security.JwtUtil;
 import com.grupo1.turnera.security.SecurityErrorHandler;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -23,40 +23,87 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
     @Bean
     public UserDetailsService userDetailsService(UsuarioRepository usuarios) {
         return email -> usuarios.findByEmail(email.trim())
-                .orElseThrow(() -> new UsernameNotFoundException("Email o contraseña incorrectos"));
+                .orElseThrow(() ->
+                        new UsernameNotFoundException("Email o contraseña incorrectos"));
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(UserDetailsService users, PasswordEncoder encoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(users);
+    public AuthenticationManager authenticationManager(
+            UserDetailsService users,
+            PasswordEncoder encoder
+    ) {
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(users);
         provider.setPasswordEncoder(encoder);
         return new ProviderManager(provider);
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtUtil jwt,
-                                                   UserDetailsService users, SecurityErrorHandler errors) throws Exception {
-        return http.csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            JwtUtil jwt,
+            UserDetailsService users,
+            SecurityErrorHandler errors
+    ) throws Exception {
+        return http
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(cache -> cache.disable())
-                .formLogin(form -> form.disable()).httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable())
                 .logout(logout -> logout.disable())
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(errors).accessDeniedHandler(errors))
+                .exceptionHandling(ex ->
+                        ex.authenticationEntryPoint(errors)
+                          .accessDeniedHandler(errors))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/pacientes").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/doctores", "/api/especialidades").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/turnos").hasAnyRole("PACIENTE", "MEDICO", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/doctores", "/api/especialidades", "/api/turnos/disponibles").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/turnos/reservar").hasRole("PACIENTE")
-                        .requestMatchers(HttpMethod.POST, "/api/turnos/sobreturno").hasAnyRole("MEDICO", "ADMIN")
-                        .anyRequest().authenticated())
-                .addFilterBefore(new JwtFilter(jwt, users, errors), UsernamePasswordAuthenticationFilter.class)
+
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.POST, "/api/pacientes")
+                        .permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/doctores",
+                                "/api/especialidades"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers("/api/admin/**")
+                        .hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/doctores",
+                                "/api/especialidades",
+                                "/api/turnos/disponibles"
+                        ).permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/turnos")
+                        .hasAnyRole("PACIENTE", "MEDICO", "ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/api/turnos/reservar")
+                        .hasRole("PACIENTE")
+
+                        .requestMatchers(HttpMethod.POST, "/api/turnos/sobreturno")
+                        .hasAnyRole("MEDICO", "ADMIN")
+
+                        .anyRequest().authenticated()
+                )
+                .addFilterBefore(
+                        new JwtFilter(jwt, users, errors),
+                        UsernamePasswordAuthenticationFilter.class
+                )
                 .build();
     }
 }

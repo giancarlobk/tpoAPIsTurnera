@@ -223,18 +223,28 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleNoResourceFound(
-            NoResourceFoundException exception,
+
+        @ExceptionHandler(AgendaInvalidaException.class)
+        public ResponseEntity<ApiErrorResponse> handleAgendaInvalida(
+                        AgendaInvalidaException exception,
+                        HttpServletRequest request
+        ) {
+                return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request.getRequestURI(), Map.of());
+        }
+    // Metodo errores de turno fuera de horario
+        @ExceptionHandler(TurnoNoDisponibleException.class)
+    public ResponseEntity<ApiErrorResponse> handleTurnoNoDisponible(
+            TurnoNoDisponibleException exception,
+
             HttpServletRequest request
     ) {
         return buildResponse(
-                HttpStatus.NOT_FOUND,
-                "Recurso no encontrado",
-                request.getRequestURI(),
-                Map.of()
-        );
-    }
+          HttpStatus.CONFLICT,
+          exception.getMessage(),
+          request.getRequestURI(),
+          Map.of()
+);
+}
 
         @ExceptionHandler(TransicionEstadoTurnoInvalidaException.class)
         public ResponseEntity<ApiErrorResponse> handleTransicionInvalida(
