@@ -4,6 +4,7 @@ import com.grupo1.turnera.dto.doctor.DoctorSummaryResponse;
 import com.grupo1.turnera.model.Doctor;
 import com.grupo1.turnera.model.Especialidad;
 import com.grupo1.turnera.repository.DoctorRepository;
+import com.grupo1.turnera.security.PasswordPolicyValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +22,9 @@ class DoctorServiceTest {
 
     @Mock
     private DoctorRepository doctorRepository;
+
+    @Mock
+    private PasswordPolicyValidator passwordPolicyValidator;
 
     @InjectMocks
     private DoctorService doctorService;

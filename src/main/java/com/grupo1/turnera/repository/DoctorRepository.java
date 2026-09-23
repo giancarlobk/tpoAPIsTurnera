@@ -20,6 +20,10 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
 
     Optional<Doctor> findByEmailIgnoreCase(String email);
 
+        Optional<Doctor> findByDni(String dni);
+
+        Optional<Doctor> findByMatriculaNacional(String matriculaNacional);
+
     @Query("""
             SELECT d
             FROM Doctor d

@@ -1,10 +1,15 @@
 package com.grupo1.turnera.service;
 
-import com.grupo1.turnera.dto.turno.TurnoReservaRequest;
+import com.grupo1.turnera.dto.turno.ReservaTurnoRequest;
+import com.grupo1.turnera.dto.turno.SobreturnoRequest;
+import com.grupo1.turnera.dto.turno.CambioEstadoTurnoRequest;
 import com.grupo1.turnera.dto.turno.TurnoResponse;
+import com.grupo1.turnera.dto.turno.UsuarioReferencia;
+import com.grupo1.turnera.exception.ArgumentoInvalidoException;
 import com.grupo1.turnera.exception.RecursoNoEncontradoException;
 import com.grupo1.turnera.exception.TurnoFueraDeHorarioException;
 import com.grupo1.turnera.exception.TurnoNoDisponibleException;
+import com.grupo1.turnera.exception.TransicionEstadoTurnoInvalidaException;
 import com.grupo1.turnera.model.Doctor;
 import com.grupo1.turnera.model.HorarioAtencion;
 import com.grupo1.turnera.model.Paciente;
@@ -65,7 +70,7 @@ class TurnoServiceTest {
             return turno;
         });
 
-        TurnoResponse response = turnoService.reservarTurno(new TurnoReservaRequest(2L, 1L, inicio));
+        TurnoResponse response = turnoService.reservarTurno(reserva(inicio), paciente);
 
         ArgumentCaptor<Turno> captor = ArgumentCaptor.forClass(Turno.class);
         verify(turnoRepository).saveAndFlush(captor.capture());
@@ -82,16 +87,18 @@ class TurnoServiceTest {
 
         assertThat(response.id()).isEqualTo(100L);
         assertThat(response.estado()).isEqualTo(EstadoTurno.RESERVADO);
-        assertThat(response.doctorId()).isEqualTo(1L);
-        assertThat(response.pacienteId()).isEqualTo(2L);
+        assertThat(response.doctor().id()).isEqualTo(1L);
+        assertThat(response.paciente().id()).isEqualTo(2L);
     }
 
     @Test
     void deberiaLanzar404SiElDoctorNoExiste() {
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
         when(doctorRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
 
+        Paciente paciente = paciente(2L);
         assertThatThrownBy(() -> turnoService.reservarTurno(
-                new TurnoReservaRequest(2L, 1L, proximoLunesA(LocalTime.of(9, 0)))))
+                reserva(proximoLunesA(LocalTime.of(9, 0))), paciente))
                 .isInstanceOf(RecursoNoEncontradoException.class);
 
         verify(turnoRepository, never()).saveAndFlush(any());
@@ -99,12 +106,11 @@ class TurnoServiceTest {
 
     @Test
     void deberiaLanzar404SiElPacienteNoExiste() {
-        when(doctorRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(doctorConHorarioLunes9a12()));
         when(pacienteRepository.findById(2L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> turnoService.reservarTurno(
-                new TurnoReservaRequest(2L, 1L, proximoLunesA(LocalTime.of(9, 0)))))
-                .isInstanceOf(RecursoNoEncontradoException.class);
+                reserva(proximoLunesA(LocalTime.of(9, 0))), paciente(2L)))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
 
         verify(turnoRepository, never()).saveAndFlush(any());
     }
@@ -117,8 +123,7 @@ class TurnoServiceTest {
         // El doctor solo atiende lunes 9 a 12; pedimos un lunes a las 20hs.
         LocalDateTime fueraDeHorario = proximoLunesA(LocalTime.of(20, 0));
 
-        assertThatThrownBy(() -> turnoService.reservarTurno(
-                new TurnoReservaRequest(2L, 1L, fueraDeHorario)))
+        assertThatThrownBy(() -> turnoService.reservarTurno(reserva(fueraDeHorario), paciente(2L)))
                 .isInstanceOf(TurnoFueraDeHorarioException.class);
 
         verify(turnoRepository, never()).saveAndFlush(any());
@@ -133,7 +138,7 @@ class TurnoServiceTest {
         when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
         when(turnoRepository.existsSolapamiento(1L, inicio, inicio.plusMinutes(30))).thenReturn(true);
 
-        assertThatThrownBy(() -> turnoService.reservarTurno(new TurnoReservaRequest(2L, 1L, inicio)))
+        assertThatThrownBy(() -> turnoService.reservarTurno(reserva(inicio), paciente(2L)))
                 .isInstanceOf(TurnoNoDisponibleException.class);
 
         verify(turnoRepository, never()).saveAndFlush(any());
@@ -150,10 +155,350 @@ class TurnoServiceTest {
         when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
         when(turnoRepository.existsSolapamiento(1L, inicio, inicio.plusMinutes(30))).thenReturn(false);
         when(turnoRepository.saveAndFlush(any(Turno.class)))
-                .thenThrow(new DataIntegrityViolationException("uk_turno_doctor_inicio"));
+                .thenThrow(new DataIntegrityViolationException("uk_turno_doctor_inicio_activo"));
 
-        assertThatThrownBy(() -> turnoService.reservarTurno(new TurnoReservaRequest(2L, 1L, inicio)))
+        assertThatThrownBy(() -> turnoService.reservarTurno(reserva(inicio), paciente(2L)))
                 .isInstanceOf(TurnoNoDisponibleException.class);
+    }
+
+    @Test
+    void deberiaCrearSobreturnoConJustificacionEHistorialDelActor() {
+        Doctor doctor = doctorConHorarioLunes9a12();
+        Paciente paciente = paciente(2L);
+        Doctor actor = Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(20, 0));
+
+        when(doctorRepository.findById(1L)).thenReturn(Optional.of(doctor));
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente));
+        when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> {
+            Turno turno = invocation.getArgument(0);
+            turno.setId(101L);
+            return turno;
+        });
+
+        TurnoResponse response = turnoService.crearSobreturno(
+                new SobreturnoRequest(null, new UsuarioReferencia(2L), inicio, inicio.plusMinutes(30), " Control adicional "),
+                actor);
+
+        ArgumentCaptor<Turno> captor = ArgumentCaptor.forClass(Turno.class);
+        verify(turnoRepository).saveAndFlush(captor.capture());
+        Turno turnoGuardado = captor.getValue();
+        assertThat(response.id()).isEqualTo(101L);
+        assertThat(turnoGuardado.getEsSobreturned()).isTrue();
+        assertThat(turnoGuardado.getJustificacionSobreturned()).isEqualTo("Control adicional");
+        assertThat(turnoGuardado.getHistorialEstados()).singleElement()
+                .satisfies(historial -> {
+                    assertThat(historial.getUsuarioIdModificador()).isEqualTo(1L);
+                    assertThat(historial.getRolUsuarioModificador()).isEqualTo(Rol.MEDICO);
+                    assertThat(historial.getMotivo()).isEqualTo("Control adicional");
+                });
+    }
+
+    @Test
+    void deberiaRechazarSobreturnoSinJustificacion() {
+        when(doctorRepository.findById(1L)).thenReturn(Optional.of(doctorConHorarioLunes9a12()));
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
+        Doctor actor = Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> turnoService.crearSobreturno(
+                new SobreturnoRequest(null, new UsuarioReferencia(2L), inicio, inicio.plusMinutes(30), "   "), actor))
+                .isInstanceOf(ArgumentoInvalidoException.class)
+                .hasMessageContaining("justificación");
+        verify(turnoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void deberiaLanzar404SiElPacienteDelSobreturnoNoExiste() {
+        when(doctorRepository.findById(1L)).thenReturn(Optional.of(doctorConHorarioLunes9a12()));
+        when(pacienteRepository.findById(999L)).thenReturn(Optional.empty());
+        Doctor actor = Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> turnoService.crearSobreturno(
+                new SobreturnoRequest(null, new UsuarioReferencia(999L), inicio, inicio.plusMinutes(30), "Control"), actor))
+                .isInstanceOf(RecursoNoEncontradoException.class)
+                .hasMessageContaining("Paciente con id 999 no encontrado");
+        verify(turnoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void deberiaPermitirTodasLasTransicionesDesdeReservado() {
+        for (EstadoTurno destino : List.of(EstadoTurno.CONFIRMADO,
+                EstadoTurno.CANCELADO_PACIENTE, EstadoTurno.CANCELADO_MEDICO)) {
+            Turno turno = turno(EstadoTurno.RESERVADO);
+            when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
+            when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                TurnoResponse response = turnoService.cambiarEstado(10L,
+                    new CambioEstadoTurnoRequest(destino, "Motivo de prueba"),
+                    destino == EstadoTurno.CANCELADO_PACIENTE ? adminActor() : medicoActor());
+
+            assertThat(response.estado()).isEqualTo(destino);
+            assertThat(turno.getHistorialEstados()).hasSize(1);
+        }
+    }
+
+    @Test
+    void deberiaPermitirTodasLasTransicionesDesdeConfirmado() {
+        for (EstadoTurno destino : List.of(EstadoTurno.ATENDIDO, EstadoTurno.AUSENTE,
+                EstadoTurno.CANCELADO_MEDICO)) {
+            Turno turno = turno(EstadoTurno.CONFIRMADO);
+            when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
+            when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            TurnoResponse response = turnoService.cambiarEstado(10L,
+                    new CambioEstadoTurnoRequest(destino, "Motivo de prueba"), medicoActor());
+
+            assertThat(response.estado()).isEqualTo(destino);
+            assertThat(turno.getHistorialEstados()).hasSize(1);
+        }
+    }
+
+    @Test
+    void deberiaResponder409ParaUnaTransicionProhibida() {
+        Turno turno = turno(EstadoTurno.ATENDIDO);
+        when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
+
+        assertThatThrownBy(() -> turnoService.cambiarEstado(10L,
+                new CambioEstadoTurnoRequest(EstadoTurno.CONFIRMADO, null), medicoActor()))
+                .isInstanceOf(TransicionEstadoTurnoInvalidaException.class);
+        verify(turnoRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cancelarTurnoDeberiaLiberarLaOcupacionActiva() {
+        Turno turno = turno(EstadoTurno.RESERVADO);
+        turno.setOcupacionActiva(true);
+        Paciente pacienteActor = turno.getPaciente();
+        when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
+        when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CambioEstadoTurnoRequest request = new CambioEstadoTurnoRequest(EstadoTurno.CANCELADO_PACIENTE,"Paciente no puede asistir");
+        turnoService.cambiarEstado(10L,request,pacienteActor);
+
+        assertThat(turno.getEstado()).isEqualTo(EstadoTurno.CANCELADO_PACIENTE);
+        assertThat(turno.getOcupacionActiva()).isNull();
+        assertThat(turno.getHistorialEstados()).isNotEmpty();
+    }
+
+    @Test
+    void deberiaReservarEnLaPrimeraFranjaDelDia() {
+        Doctor doctor = doctorConDosFranjasLunes();
+        Paciente paciente = paciente(2L);
+        LocalDateTime inicio =proximoLunesA(LocalTime.of(9, 30));
+        when(doctorRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(doctor));
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente));
+        when(turnoRepository.existsSolapamiento(1L,inicio,inicio.plusMinutes(30))).thenReturn(false);
+        when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> {
+
+        Turno turno =invocation.getArgument(0);
+
+        turno.setId(100L);
+
+        return turno;
+    });
+
+    TurnoResponse response =turnoService.reservarTurno(reserva(inicio),paciente);
+
+    assertThat(response.fechaHoraInicio()).isEqualTo(inicio);
+
+    assertThat(response.fechaHoraFin()).isEqualTo(inicio.plusMinutes(30));
+    }
+
+    @Test
+    void deberiaReservarEnLaSegundaFranjaDelMismoDia() {
+        Doctor doctor =doctorConDosFranjasLunes();
+        Paciente paciente =paciente(2L);
+        LocalDateTime inicio = proximoLunesA(LocalTime.of(14, 0));
+        when(doctorRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(doctor));
+        when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente));
+        when(turnoRepository.existsSolapamiento(
+                    1L,
+                    inicio,
+                    inicio.plusMinutes(30)
+            )
+    ).thenReturn(false);
+
+    when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> {Turno turno = invocation.getArgument(0);
+
+        turno.setId(101L);
+
+        return turno;
+    });
+
+    TurnoResponse response =turnoService.reservarTurno(reserva(inicio),paciente);
+
+    assertThat(response.fechaHoraInicio()).isEqualTo(inicio);
+
+    assertThat(response.fechaHoraFin()).isEqualTo(inicio.plusMinutes(30));
+    }
+
+    @Test
+    void deberiaAceptarElUltimoSlotExactoDeLaFranja() {
+
+    Doctor doctor =doctorConHorarioLunes9a12();
+
+    Paciente paciente =
+         paciente(2L);
+
+    LocalDateTime inicio =
+            proximoLunesA(
+                    LocalTime.of(11, 30)
+            );
+
+    when(
+            doctorRepository
+                    .findByIdForUpdate(1L)
+    ).thenReturn(
+            Optional.of(doctor)
+    );
+
+    when(
+            pacienteRepository.findById(2L)
+    ).thenReturn(
+            Optional.of(paciente)
+    );
+
+    when(
+            turnoRepository.existsSolapamiento(
+                    1L,
+                    inicio,
+                    inicio.plusMinutes(30)
+            )
+    ).thenReturn(false);
+
+    when(
+            turnoRepository.saveAndFlush(
+                    any(Turno.class)
+            )
+    ).thenAnswer(invocation -> {
+
+        Turno turno =
+                invocation.getArgument(0);
+
+        turno.setId(102L);
+
+        return turno;
+    });
+
+    TurnoResponse response =
+            turnoService.reservarTurno(
+                    reserva(inicio),
+                    paciente
+            );
+
+    assertThat(
+            response.fechaHoraInicio()
+    ).isEqualTo(inicio);
+
+    assertThat(
+            response.fechaHoraFin()
+    ).isEqualTo(
+            proximoLunesA(
+                    LocalTime.of(12, 0)
+            )
+    );
+    }
+
+    @Test
+    void deberiaRechazarTurnoQueTerminaUnMinutoFueraDeLaFranja() {
+
+    Doctor doctor =
+            doctorConHorarioLunes9a12();
+
+    Paciente paciente =
+            paciente(2L);
+
+    LocalDateTime inicio =
+            proximoLunesA(
+                    LocalTime.of(11, 31)
+            );
+
+    when(
+            doctorRepository
+                    .findByIdForUpdate(1L)
+    ).thenReturn(
+            Optional.of(doctor)
+    );
+
+    when(
+            pacienteRepository.findById(2L)
+    ).thenReturn(
+            Optional.of(paciente)
+    );
+
+    assertThatThrownBy(() ->
+            turnoService.reservarTurno(
+                    reserva(inicio),
+                    paciente
+            )
+    )
+            .isInstanceOf(
+                    TurnoFueraDeHorarioException.class
+            );
+
+    verify(
+            turnoRepository,
+            never()
+    ).saveAndFlush(any());
+    }
+
+    @Test
+    void deberiaRechazarInicioDesalineadoConLaGrilla() {
+
+    Doctor doctor =
+            doctorConHorarioLunes9a12();
+
+    Paciente paciente =
+            paciente(2L);
+
+    LocalDateTime inicio =
+            proximoLunesA(
+                    LocalTime.of(9, 7)
+            );
+
+    when(
+            doctorRepository
+                    .findByIdForUpdate(1L)
+    ).thenReturn(
+            Optional.of(doctor)
+    );
+
+    when(
+            pacienteRepository.findById(2L)
+    ).thenReturn(
+            Optional.of(paciente)
+    );
+
+    assertThatThrownBy(() ->
+            turnoService.reservarTurno(
+                    reserva(inicio),
+                    paciente
+            )
+    )
+            .isInstanceOf(
+                    TurnoFueraDeHorarioException.class
+            );
+
+    verify(
+            turnoRepository,
+            never()
+    ).saveAndFlush(any());
+}
+
+    private Turno turno(EstadoTurno estado) {
+        return Turno.builder().id(10L).doctor(doctorConHorarioLunes9a12())
+                .paciente(paciente(2L)).fechaHoraInicio(proximoLunesA(LocalTime.of(9, 0)))
+                .fechaHoraFin(proximoLunesA(LocalTime.of(9, 30))).estado(estado).build();
+    }
+
+    private Doctor medicoActor() {
+        return Doctor.builder().id(1L).rol(Rol.MEDICO).activo(true).build();
+    }
+
+    private com.grupo1.turnera.model.Administrador adminActor() {
+        return com.grupo1.turnera.model.Administrador.builder().id(99L).rol(Rol.ADMIN).activo(true).build();
     }
 
     private Doctor doctorConHorarioLunes9a12() {
@@ -162,6 +507,8 @@ class TurnoServiceTest {
                 .nombre("Juan")
                 .apellido("Gomez")
                 .matriculaNacional("MN-999")
+                .rol(Rol.MEDICO)
+                .activo(true)
                 .build();
         HorarioAtencion horario = HorarioAtencion.builder()
                 .doctor(doctor)
@@ -174,13 +521,50 @@ class TurnoServiceTest {
         return doctor;
     }
 
+    private Doctor doctorConDosFranjasLunes() {
+
+    Doctor doctor = Doctor.builder()
+            .id(1L)
+            .nombre("Juan")
+            .apellido("Gomez")
+            .matriculaNacional("MN-999")
+            .rol(Rol.MEDICO)
+            .activo(true)
+            .build();
+
+    HorarioAtencion manana = HorarioAtencion.builder()
+                    .doctor(doctor)
+                    .diaSemana(DiaSemana.LUNES)
+                    .horaInicio(LocalTime.of(9, 0))
+                    .horaFin(LocalTime.of(12, 0))
+                    .duracionTurnoMinutos(30)
+                    .build();
+
+    HorarioAtencion tarde = HorarioAtencion.builder()
+                    .doctor(doctor)
+                    .diaSemana(DiaSemana.LUNES)
+                    .horaInicio(LocalTime.of(14, 0))
+                    .horaFin(LocalTime.of(18, 0))
+                    .duracionTurnoMinutos(30)
+                    .build();
+
+    doctor.setHorariosAtencion(List.of(manana,tarde));
+        return doctor;
+    }
+
     private Paciente paciente(Long id) {
         return Paciente.builder()
                 .id(id)
                 .nombre("Ana")
                 .apellido("Perez")
                 .fechaNacimiento(LocalDate.of(1995, 4, 18))
+                .rol(Rol.PACIENTE)
+                .activo(true)
                 .build();
+    }
+
+    private ReservaTurnoRequest reserva(LocalDateTime inicio) {
+        return new ReservaTurnoRequest(new UsuarioReferencia(1L), inicio);
     }
 
     private LocalDateTime proximoLunesA(LocalTime hora) {

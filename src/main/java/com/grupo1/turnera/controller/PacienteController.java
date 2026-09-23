@@ -3,7 +3,7 @@ package com.grupo1.turnera.controller;
 import com.grupo1.turnera.dto.paciente.PacienteCreateRequest;
 import com.grupo1.turnera.dto.paciente.PacienteResponse;
 import com.grupo1.turnera.exception.ApiErrorResponse;
-import com.grupo1.turnera.service.PacienteService;
+import com.grupo1.turnera.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Pacientes", description = "Registro de pacientes")
 public class PacienteController {
 
-    private final PacienteService pacienteService;
+    private final AuthenticationService authenticationService;
 
     @PostMapping // Este metodo recibe POST /api/pacientes
     @Operation(summary = "Registrar paciente", description = "Crea un paciente con rol PACIENTE y estado activo.")
@@ -38,7 +38,7 @@ public class PacienteController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public ResponseEntity<PacienteResponse> registrarPaciente(@Valid @RequestBody PacienteCreateRequest request) {
-        PacienteResponse pacienteCreado = pacienteService.registrarPaciente(request);
+        PacienteResponse pacienteCreado = authenticationService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(pacienteCreado);
     }
 }

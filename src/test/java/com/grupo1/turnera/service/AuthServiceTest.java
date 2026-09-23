@@ -12,7 +12,10 @@ import com.grupo1.turnera.repository.DoctorRepository;
 import com.grupo1.turnera.repository.PacienteRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.junit.jupiter.api.BeforeEach;
+import com.grupo1.turnera.config.SecurityConfig;
+import com.grupo1.turnera.repository.UsuarioRepository;
+import com.grupo1.turnera.security.JwtUtil;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,8 +47,17 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @InjectMocks
-    private AuthService authService;
+    private AuthenticationService authService;
+
+    @BeforeEach
+    void configureAuthenticationManager() {
+        org.mockito.Mockito.lenient().when(passwordEncoder.encode(org.mockito.ArgumentMatchers.anyString())).thenReturn(PASSWORD_HASH);
+        var usuarios = new UsuarioRepository(pacienteRepository, doctorRepository, administradorRepository);
+        var config = new SecurityConfig();
+        var manager = config.authenticationManager(config.userDetailsService(usuarios), passwordEncoder);
+        var jwt = new JwtUtil("c2VjcmV0by1zb2xvLXBhcmEtcHJ1ZWJhcy1qd3QtdHVybmVyYS0xMjM0NTY=", 3600000);
+        authService = new AuthenticationService(manager, org.mockito.Mockito.mock(PacienteService.class), jwt);
+    }
 
     @Test
     void deberiaAutenticarPacienteActivoConPasswordValida() {

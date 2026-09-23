@@ -44,4 +44,9 @@ public record PacienteCreateRequest(
         @Size(max = 50, message = "El número de afiliado no puede superar los 50 caracteres")
         String numeroAfiliado
 ) {
+    public PacienteCreateRequest {
+        if (email != null) {
+            email = email.trim();
+        }
+    }
 }
