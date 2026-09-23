@@ -3,7 +3,6 @@ package com.grupo1.turnera.service;
 import com.grupo1.turnera.dto.doctor.DoctorSummaryResponse;
 import com.grupo1.turnera.dto.doctor.DoctorCreateRequest;
 import com.grupo1.turnera.exception.DniDuplicadoException;
-import com.grupo1.turnera.exception.EmailDuplicadoException;
 import com.grupo1.turnera.exception.MatriculaDuplicadaException;
 import com.grupo1.turnera.exception.RecursoNoEncontradoException;
 import com.grupo1.turnera.model.Doctor;
@@ -26,6 +25,7 @@ public class DoctorService {
     private final DoctorRepository doctorRepository;
     private final EspecialidadRepository especialidadRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailUnicidadService emailUnicidadService;
     private final PasswordPolicyValidator passwordPolicyValidator;
 
     @Transactional(readOnly = true)
@@ -43,14 +43,11 @@ public class DoctorService {
         passwordPolicyValidator.validateForEncoding(request.password());
 
         String dni = request.dni().trim();
-        String email = request.email().trim();
+        String email = emailUnicidadService.normalizar(request.email());
         String matricula = request.matriculaNacional().trim();
 
         if (doctorRepository.findByDni(dni).isPresent()) {
             throw new DniDuplicadoException(dni);
-        }
-        if (doctorRepository.findByEmailIgnoreCase(email).isPresent()) {
-            throw new EmailDuplicadoException(email);
         }
         if (doctorRepository.findByMatriculaNacional(matricula).isPresent()) {
             throw new MatriculaDuplicadaException(matricula);
@@ -58,6 +55,8 @@ public class DoctorService {
 
         Especialidad especialidad = especialidadRepository.findById(request.especialidadId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Especialidad", request.especialidadId()));
+
+        emailUnicidadService.reservar(email);
 
         Doctor doctor = Doctor.builder()
                 .dni(dni)

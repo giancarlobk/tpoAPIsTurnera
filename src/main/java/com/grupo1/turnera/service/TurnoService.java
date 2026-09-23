@@ -29,6 +29,9 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class TurnoService {
+    private static final List<String> CAMPOS_ORDENAMIENTO = List.of(
+            "id", "fechaHoraInicio", "fechaHoraFin", "estado", "esSobreturned");
+
     private final TurnoRepository turnoRepository;
     private final DoctorRepository doctorRepository;
     private final PacienteRepository pacienteRepository;
@@ -180,6 +183,13 @@ public class TurnoService {
     public Page<TurnoResponse> buscarTurnosConFiltros(
             Long pacienteId, Long doctorId, EstadoTurno estado,
             LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable) {
+        pageable.getSort().forEach(order -> {
+            if (!CAMPOS_ORDENAMIENTO.contains(order.getProperty())) {
+                throw new ArgumentoInvalidoException(
+                        "Campo de ordenamiento no permitido: " + order.getProperty()
+                                + ". Campos permitidos: " + String.join(", ", CAMPOS_ORDENAMIENTO));
+            }
+        });
         return turnoRepository.buscarConFiltros(
                 pacienteId, doctorId, estado, fechaDesde, fechaHasta, pageable)
                 .map(TurnoResponse::fromEntity);
@@ -310,6 +320,7 @@ public class TurnoService {
             .esSobreturned(false)
             .ocupacionActiva(true)
             .build();
+    }
 
     private void exigirRol(BaseUsuario actor, Rol... permitidos) {
         if (actor == null || !actor.isEnabled() || !List.of(permitidos).contains(actor.getRol())) {

@@ -49,10 +49,11 @@ URL base local: `http://localhost:8080`
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
 | `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` con `List<EspecialidadResponse>` |
-| `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` |
-| `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409` |
-| `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409` |
-| `PATCH` | `/api/turnos/{turnoId}/estado` | Cambia el estado con autorización e historial. | Estado destino y motivo opcional/obligatorio según transición | `200`, `400`, `401`, `403`, `404`, `409` |
+| `GET` | `/api/turnos/disponibles` | Consulta horarios sin datos de pacientes. | Query opcional: `doctorId` | `200` con `List<TurnoDisponibleResponse>`, `400`, `500` |
+| `GET` | `/api/turnos` | Busca turnos con filtros y paginación. | Query opcional: `pacienteId`, `doctorId`, `estado`, `fechaDesde`, `fechaHasta`, `page`, `size`, `sort` | `200` con `Page<TurnoResponse>`, `400`, `401`, `500` |
+| `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
+| `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
+| `PATCH` | `/api/turnos/{turnoId}/estado` | Cambia el estado con autorización e historial. | Estado destino y motivo opcional/obligatorio según transición | `200`, `400`, `401`, `403`, `404`, `409`, `500` |
 
 ### Contratos high level
 
@@ -152,7 +153,7 @@ Ejemplo (`POST /api/turnos/sobreturno`, JWT de `MEDICO` o `ADMIN`):
 }
 ```
 
-Responde `201` con `TurnoResponse`. Devuelve `400` si faltan o son inválidos la justificación o las fechas, `401` si falta un JWT válido, `403` si el rol o la agenda no están autorizados y `404` si el médico o paciente no existen o están inactivos. Los ejemplos de autorización están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
+Responde `201` con `TurnoResponse`. Devuelve `400` si faltan o son inválidos la justificación o las fechas, `401` si falta un JWT válido, `403` si el rol o la agenda no están autorizados, `404` si el médico o paciente no existen o están inactivos y `409` si el horario entra en conflicto con otro turno. Los ejemplos de autorización están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
 
 ### Cambio de estado de un turno
 
@@ -233,7 +234,7 @@ Con la aplicación en ejecución:
 - [Swagger UI](http://localhost:8080/swagger-ui.html): exploración y prueba interactiva de los endpoints.
 - [OpenAPI JSON](http://localhost:8080/v3/api-docs): especificación consumible por herramientas y clientes.
 
-La especificación cubre todos los endpoints actuales y utiliza esquemas públicos que omiten contraseñas y relaciones internas de persistencia.
+Los contratos de turnos documentan los cuerpos de éxito: `/api/turnos` devuelve una página cuyo `content` contiene `TurnoResponse`, y `/api/turnos/disponibles` devuelve un array de `TurnoDisponibleResponse`. El sobreturno declara `409` cuando el horario entra en conflicto. Los esquemas de respuesta omiten contraseñas y relaciones internas de persistencia. La cobertura de códigos y esquemas de los demás endpoints no se considera exhaustiva.
 
 ## Seguridad y permisos
 
@@ -270,6 +271,7 @@ Para Docker, guardar una clave generada de la misma forma como `JWT_SECRET=<valo
 | `GET /api/doctores`, `GET /api/especialidades` | Público: catálogo para elegir profesional |
 | `POST /api/doctores`, `POST /api/especialidades` | ADMIN: altas administrativas |
 | `GET /api/turnos/disponibles` | Público: horarios e id del médico, sin datos de pacientes |
+| `GET /api/turnos` | Cualquier usuario autenticado: búsqueda paginada |
 | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | Público: documentación de la API |
 | `POST /api/turnos/reservar` | PACIENTE: reserva exclusivamente para sí mismo |
 | `POST /api/turnos/sobreturno` | MEDICO: su propia agenda; ADMIN: cualquier médico activo |

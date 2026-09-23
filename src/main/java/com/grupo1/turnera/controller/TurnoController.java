@@ -1,5 +1,6 @@
 package com.grupo1.turnera.controller;
 
+import com.grupo1.turnera.config.openapi.TurnoPageResponse;
 import com.grupo1.turnera.dto.turno.ReservaTurnoRequest;
 import com.grupo1.turnera.dto.turno.CambioEstadoTurnoRequest;
 import com.grupo1.turnera.dto.turno.SobreturnoRequest;
@@ -11,6 +12,7 @@ import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.service.TurnoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -35,17 +37,17 @@ import java.util.List;
 @RequiredArgsConstructor
 @Tag(name = "Turnos", description = "Reserva, sobreturnos y cambios de estado")
 @ApiResponse(responseCode = "400", description = "Datos inválidos",
-        content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+        content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
 public class TurnoController {
     private final TurnoService turnoService;
 
     @PostMapping("/reservar")
     @ApiResponse(responseCode = "201", description = "Turno reservado",
-            content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = TurnoResponse.class)))
     @ApiResponse(responseCode = "404", description = "Médico activo no encontrado",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "El horario ya está ocupado",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @Operation(summary = "Reservar turno",
             description = "PACIENTE: la reserva pertenece al principal autenticado y respeta la agenda del médico.",
             security = @SecurityRequirement(name = "bearerAuth"))
@@ -56,11 +58,13 @@ public class TurnoController {
 
     @PostMapping("/sobreturno")
     @ApiResponse(responseCode = "201", description = "Sobreturno creado",
-            content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = TurnoResponse.class)))
     @ApiResponse(responseCode = "404", description = "Médico o paciente activo no encontrado",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @ApiResponse(responseCode = "403", description = "El rol o la agenda no están autorizados",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "409", description = "El horario entra en conflicto con otro turno",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @Operation(summary = "Crear sobreturno",
             description = "MEDICO: solo su agenda. ADMIN: indica el doctor. El paciente es el destinatario del turno.",
             security = @SecurityRequirement(name = "bearerAuth"))
@@ -71,11 +75,11 @@ public class TurnoController {
 
     @PatchMapping("/{turnoId}/estado")
     @ApiResponse(responseCode = "200", description = "Estado actualizado",
-            content = @Content(schema = @Schema(implementation = TurnoResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = TurnoResponse.class)))
     @ApiResponse(responseCode = "404", description = "Turno no encontrado",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "Transición de estado no permitida",
-            content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @Operation(summary = "Actualizar parcialmente el estado de un turno",
             description = "Modifica solo el estado y el motivo del turno. PACIENTE cancela sus turnos; "
                     + "MEDICO actualiza su agenda; ADMIN puede actualizar cualquier turno.",
@@ -87,12 +91,17 @@ public class TurnoController {
     }
 
     @GetMapping("/disponibles")
+    @ApiResponse(responseCode = "200", description = "Horarios disponibles",
+            content = @Content(mediaType = "application/json",
+                    array = @ArraySchema(schema = @Schema(implementation = TurnoDisponibleResponse.class))))
     @Operation(summary = "Consultar turnos disponibles", description = "Público: solo horarios e identificador del médico.")
     public ResponseEntity<List<TurnoDisponibleResponse>> obtenerTurnosDisponibles(
             @RequestParam(required = false) Long doctorId) {
         return ResponseEntity.ok(turnoService.obtenerDisponibles(doctorId));
     }
     @GetMapping
+    @ApiResponse(responseCode = "200", description = "Página de turnos filtrados",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = TurnoPageResponse.class)))
     @Operation(summary = "Buscar turnos por filtros",
             description = "Requiere autenticación y admite filtros opcionales con paginación.",
             security = @SecurityRequirement(name = "bearerAuth"))

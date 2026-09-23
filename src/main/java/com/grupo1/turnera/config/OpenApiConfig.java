@@ -44,7 +44,9 @@ public class OpenApiConfig {
             operation.setSecurity(publico ? List.of() : List.of(new SecurityRequirement().addList("bearerAuth")));
             if (!publico) {
                 operation.getResponses().addApiResponse("401", error("Token ausente, inválido o vencido"));
-                operation.getResponses().addApiResponse("403", error("Rol o identidad sin permiso"));
+                if (!(method == PathItem.HttpMethod.GET && path.equals("/api/turnos"))) {
+                    operation.getResponses().addApiResponse("403", error("Rol o identidad sin permiso"));
+                }
             }
             operation.getResponses().addApiResponse("500", error("Error interno inesperado"));
         }));
