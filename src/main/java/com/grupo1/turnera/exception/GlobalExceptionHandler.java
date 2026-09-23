@@ -5,9 +5,12 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -15,6 +18,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -22,6 +27,8 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // =========================================================
     // 400 - ERRORES DE VALIDACIÓN DE DTO
@@ -120,6 +127,28 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(),
                 Map.of()
         );
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodNotAllowed(
+            HttpRequestMethodNotSupportedException exception,
+            HttpServletRequest request
+    ) {
+        HttpHeaders headers = new HttpHeaders();
+        if (exception.getSupportedHttpMethods() != null) {
+            headers.setAllow(exception.getSupportedHttpMethods());
+        }
+        return buildResponse(HttpStatus.METHOD_NOT_ALLOWED,
+                "Método HTTP no permitido", request.getRequestURI(), Map.of(), headers);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException exception,
+            HttpServletRequest request
+    ) {
+        return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "Content-Type no soportado", request.getRequestURI(), Map.of());
     }
 
 
@@ -290,6 +319,8 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
 
+        log.error("Error inesperado en {}", request.getRequestURI(), exception);
+
         return buildResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "Ocurrió un error interno inesperado",
@@ -310,6 +341,17 @@ public class GlobalExceptionHandler {
             Map<String, String> fieldErrors
     ) {
 
+        return buildResponse(status, message, path, fieldErrors, new HttpHeaders());
+    }
+
+    private ResponseEntity<ApiErrorResponse> buildResponse(
+            HttpStatus status,
+            String message,
+            String path,
+            Map<String, String> fieldErrors,
+            HttpHeaders headers
+    ) {
+
         ApiErrorResponse response =
                 new ApiErrorResponse(
                         Instant.now(),
@@ -322,6 +364,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(status)
+                .headers(headers)
                 .body(response);
     }
 }
