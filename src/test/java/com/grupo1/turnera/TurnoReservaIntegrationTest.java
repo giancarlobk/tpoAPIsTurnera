@@ -9,6 +9,7 @@ import com.grupo1.turnera.model.enums.DiaSemana;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.TurnoRepository;
 import com.grupo1.turnera.security.JwtUtil;
+import com.grupo1.turnera.model.enums.EstadoTurno;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -193,6 +196,147 @@ class TurnoReservaIntegrationTest {
 
         assertThat(turnoRepository.count()).isEqualTo(1);
     }
+    @Test
+void deberiaLiberarHorarioCanceladoYPermitirNuevaReserva()
+        throws Exception {
+
+    // ======================================================
+    // 1. Reservar
+    // ======================================================
+
+    mockMvc.perform(
+                    post("/api/turnos/reservar")
+                            .header("Authorization","Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                    requestBody(
+                                            pacienteId,
+                                            doctorId,
+                                            proximoLunes9am
+                                    )
+                            )
+            )
+            .andExpect(status().isCreated())
+            .andExpect(
+                    jsonPath("$.estado")
+                            .value("RESERVADO")
+            );
+
+    entityManager.flush();
+    entityManager.clear();
+
+    Turno primerTurno =
+            turnoRepository.findAll()
+                    .stream()
+                    .filter(turno ->
+                            turno.getFechaHoraInicio()
+                                    .equals(proximoLunes9am)
+                    )
+                    .findFirst()
+                    .orElseThrow();
+
+    Long primerTurnoId = primerTurno.getId();
+
+    assertThat(
+            primerTurno.getOcupacionActiva()
+    ).isTrue();
+
+
+    // ======================================================
+    // 2. Cancelar
+    // ======================================================
+
+    mockMvc.perform(
+                    patch(
+                            "/api/turnos/{turnoId}/estado",
+                            primerTurnoId
+                    )
+                            .header(
+                                    "Authorization",
+                                    "Bearer " + token
+                            )
+                            .contentType(
+                                    MediaType.APPLICATION_JSON
+                            )
+                            .content("""
+                                    {
+                                      "estadoDestino":
+                                          "CANCELADO_PACIENTE",
+                                      "motivo":
+                                          "Paciente no puede asistir"
+                                    }
+                                    """)
+            )
+            .andExpect(status().isOk())
+            .andExpect(
+                    jsonPath("$.estado")
+                            .value("CANCELADO_PACIENTE")
+            );
+
+
+    entityManager.flush();
+    entityManager.clear();
+
+
+    // ======================================================
+    // 3. Comprobar que el turno anterior NO fue eliminado
+    // ======================================================
+
+    Turno turnoCancelado =turnoRepository.findByIdWithHistorial(primerTurnoId).orElseThrow();
+
+    assertThat(turnoCancelado.getEstado()).isEqualTo(EstadoTurno.CANCELADO_PACIENTE);
+
+    assertThat(turnoCancelado.getOcupacionActiva()).isNull();
+
+    /*
+     * El historial sigue disponible.
+     */
+    assertThat(turnoCancelado.getHistorialEstados()).hasSize(2);
+
+
+    // ======================================================
+    // 4. Volver a reservar exactamente el mismo horario
+    // ======================================================
+
+    mockMvc.perform(post("/api/turnos/reservar").header("Authorization","Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(requestBody(pacienteId,doctorId,proximoLunes9am)))
+            .andExpect(status().isCreated())
+            .andExpect(
+                    jsonPath("$.estado")
+                            .value("RESERVADO")
+            );
+
+
+    entityManager.flush();
+    entityManager.clear();
+
+
+    // ======================================================
+    // 5. Hay dos filas:
+    //
+    //    - una cancelada histórica
+    //    - una reserva nueva activa
+    // ======================================================
+
+    assertThat(
+            turnoRepository.count()
+    ).isEqualTo(2);
+
+    long turnosActivos =
+            turnoRepository.findAll()
+                    .stream()
+                    .filter(turno ->
+                            Boolean.TRUE.equals(
+                                    turno.getOcupacionActiva()
+                            )
+                    )
+                    .count();
+
+    assertThat(
+            turnosActivos
+    ).isEqualTo(1);
+}
 
     private String requestBody(Long pacienteId, Long doctorId, LocalDateTime fechaHoraInicio) {
         return """
