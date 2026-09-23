@@ -155,7 +155,7 @@ class TurnoServiceTest {
         when(pacienteRepository.findById(2L)).thenReturn(Optional.of(paciente(2L)));
         when(turnoRepository.existsSolapamiento(1L, inicio, inicio.plusMinutes(30))).thenReturn(false);
         when(turnoRepository.saveAndFlush(any(Turno.class)))
-                .thenThrow(new DataIntegrityViolationException("uk_turno_doctor_inicio"));
+                .thenThrow(new DataIntegrityViolationException("uk_turno_doctor_inicio_activo"));
 
         assertThatThrownBy(() -> turnoService.reservarTurno(reserva(inicio), paciente(2L)))
                 .isInstanceOf(TurnoNoDisponibleException.class);
