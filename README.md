@@ -46,6 +46,9 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/auth/login` | Autentica un paciente, médico o administrador activo. | `email`, `password` | `200`, `400`, `401` |
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
+| `POST` | `/api/admin/especialidades` | Crea una especialidad. Requiere `ADMIN` por HTTP Basic. | Nombre y descripción | `201`, `400`, `401`, `403` |
+| `POST` | `/api/admin/doctores` | Crea un médico asociado a una especialidad. Requiere `ADMIN`. | Datos personales, matrícula y especialidad | `201`, `400`, `401`, `403`, `404` |
+| `PUT` | `/api/admin/doctores/{id}/horarios` | Reemplaza la agenda completa del médico. Requiere `ADMIN`. | Lista de franjas | `200`, `400`, `401`, `403`, `404` |
 | `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
 | `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
 
@@ -191,6 +194,32 @@ Servicios expuestos por defecto:
 | MySQL | `3306` | Persistencia del entorno local |
 
 > Las credenciales de `.env.example` son únicamente de desarrollo y deben reemplazarse fuera del entorno local.
+
+### Instalación limpia y primera reserva
+
+El primer administrador se crea únicamente cuando se habilita explícitamente el bootstrap y se entregan sus datos por variables de entorno. No hay contraseña fija en el repositorio:
+
+```powershell
+$env:TURNERA_BOOTSTRAP_ADMIN_ENABLED="true"
+$env:TURNERA_BOOTSTRAP_ADMIN_DNI="20123456"
+$env:TURNERA_BOOTSTRAP_ADMIN_NOMBRE="Ada"
+$env:TURNERA_BOOTSTRAP_ADMIN_APELLIDO="Administrador"
+$env:TURNERA_BOOTSTRAP_ADMIN_EMAIL="admin@turnera.local"
+$env:TURNERA_BOOTSTRAP_ADMIN_PASSWORD="UnaClaveLargaYUnica"
+docker compose up --build
+```
+
+El bootstrap es idempotente: solo crea el administrador si la tabla no contiene ninguno. Después del primer arranque se debe establecer `TURNERA_BOOTSTRAP_ADMIN_ENABLED=false` y reiniciar. La contraseña se almacena con BCrypt.
+
+Con las credenciales del administrador, usar HTTP Basic en Swagger o en cada request:
+
+1. `POST /api/admin/especialidades` con `{"nombre":"Clínica Médica","descripcion":"Atención clínica"}` y guardar el `id`.
+2. `POST /api/admin/doctores` con datos del médico, una contraseña propia y el `especialidadId`; guardar el `id`.
+3. `PUT /api/admin/doctores/{id}/horarios` con, por ejemplo, `[ {"diaSemana":"LUNES","horaInicio":"09:00:00","horaFin":"12:00:00","duracionTurnoMinutos":30} ]`.
+4. Registrar un paciente con `POST /api/pacientes` y autenticarlo con `POST /api/auth/login`.
+5. Reservar con `POST /api/turnos/reservar`, usando el id del paciente, el id del médico y una fecha futura que caiga el lunes entre las 09:00 y las 11:30.
+
+Las operaciones administrativas no tienen registro público: `/api/admin/**` responde `401` sin credenciales y `403` para pacientes o médicos. La creación de administradores no se expone como endpoint.
 
 ## Documentación interactiva
 

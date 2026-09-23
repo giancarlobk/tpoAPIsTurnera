@@ -67,7 +67,7 @@ public class PacienteService {
 
     private String normalizar(String valor) {
         return Optional.ofNullable(valor)
-                .map(String::trim)
+                .map(texto -> texto.trim())
                 .filter(texto -> !texto.isEmpty())
                 .orElse(null);
     }

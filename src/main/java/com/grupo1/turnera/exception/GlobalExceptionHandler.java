@@ -75,6 +75,14 @@ public class GlobalExceptionHandler {
                 Map.of()
         );
     }
+
+        @ExceptionHandler(AgendaInvalidaException.class)
+        public ResponseEntity<ApiErrorResponse> handleAgendaInvalida(
+                        AgendaInvalidaException exception,
+                        HttpServletRequest request
+        ) {
+                return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request.getRequestURI(), Map.of());
+        }
     // Metodo errores de turno fuera de horario
         @ExceptionHandler(TurnoNoDisponibleException.class)
     public ResponseEntity<ApiErrorResponse> handleTurnoNoDisponible(
