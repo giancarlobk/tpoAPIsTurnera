@@ -316,6 +316,37 @@ class TurnoServiceTest {
         return doctor;
     }
 
+    private Doctor doctorConDosFranjasLunes() {
+
+    Doctor doctor = Doctor.builder()
+            .id(1L)
+            .nombre("Juan")
+            .apellido("Gomez")
+            .matriculaNacional("MN-999")
+            .rol(Rol.MEDICO)
+            .activo(true)
+            .build();
+
+    HorarioAtencion manana = HorarioAtencion.builder()
+                    .doctor(doctor)
+                    .diaSemana(DiaSemana.LUNES)
+                    .horaInicio(LocalTime.of(9, 0))
+                    .horaFin(LocalTime.of(12, 0))
+                    .duracionTurnoMinutos(30)
+                    .build();
+
+    HorarioAtencion tarde = HorarioAtencion.builder()
+                    .doctor(doctor)
+                    .diaSemana(DiaSemana.LUNES)
+                    .horaInicio(LocalTime.of(14, 0))
+                    .horaFin(LocalTime.of(18, 0))
+                    .duracionTurnoMinutos(30)
+                    .build();
+
+    doctor.setHorariosAtencion(List.of(manana,tarde));
+        return doctor;
+    }
+
     private Paciente paciente(Long id) {
         return Paciente.builder()
                 .id(id)
