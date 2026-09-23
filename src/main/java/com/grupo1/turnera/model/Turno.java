@@ -83,7 +83,3 @@ public class Turno {
     )
     private HistoriaClinica historiaClinica;
 }
-
-    @OneToOne(mappedBy = "turno", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private HistoriaClinica historiaClinica;
-}

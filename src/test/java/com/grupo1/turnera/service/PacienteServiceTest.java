@@ -9,7 +9,6 @@ import com.grupo1.turnera.exception.TelefonoDuplicadoException;
 import com.grupo1.turnera.model.Paciente;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.PacienteRepository;
-import com.grupo1.turnera.repository.UsuarioRepository;
 import com.grupo1.turnera.security.PasswordPolicyValidator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,11 +20,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +46,7 @@ class PacienteServiceTest {
     private PacienteRepository pacienteRepository;
 
     @Mock
-    private UsuarioRepository usuarioRepository;
+    private EmailUnicidadService emailUnicidadService;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -55,6 +56,12 @@ class PacienteServiceTest {
 
     @InjectMocks
     private PacienteService pacienteService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void normalizarEmail() {
+        when(emailUnicidadService.normalizar(any(String.class)))
+                .thenAnswer(invocation -> ((String) invocation.getArgument(0)).trim().toLowerCase(Locale.ROOT));
+    }
 
     @Test
     void deberiaRegistrarUnPacienteValidoConRolYEstadoPorDefecto() {
@@ -85,7 +92,7 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarEmailDuplicado() {
-        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(true);
+        doThrow(new EmailDuplicadoException(EMAIL)).when(emailUnicidadService).reservar(EMAIL);
 
         assertThatThrownBy(() -> pacienteService.registrarPaciente(requestValido()))
                 .isInstanceOf(EmailDuplicadoException.class);
@@ -95,7 +102,6 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarDniDuplicado() {
-        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.of(new Paciente()));
 
         assertThatThrownBy(() -> pacienteService.registrarPaciente(requestValido()))
@@ -106,7 +112,6 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarTelefonoDuplicadoCuandoSeInformaTelefono() {
-        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(pacienteRepository.findByTelefono(TELEFONO)).thenReturn(Optional.of(new Paciente()));
 
@@ -118,7 +123,6 @@ class PacienteServiceTest {
 
     @Test
     void deberiaRechazarNumeroAfiliadoDuplicadoCuandoSeInforma() {
-        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(pacienteRepository.findByTelefono(TELEFONO)).thenReturn(Optional.empty());
         when(pacienteRepository.findByNumeroAfiliado("123456789")).thenReturn(Optional.of(new Paciente()));
@@ -135,7 +139,6 @@ class PacienteServiceTest {
                 DNI, NOMBRE, APELLIDO, EMAIL, PASSWORD,
                 null, FECHA_NACIMIENTO, null, null
         );
-        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(passwordEncoder.encode(PASSWORD)).thenReturn(PASSWORD_HASH);
         when(pacienteRepository.save(any(Paciente.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -147,7 +150,6 @@ class PacienteServiceTest {
     }
 
     private void givenSinDuplicados() {
-        when(usuarioRepository.existsByEmail(EMAIL)).thenReturn(false);
         when(pacienteRepository.findByDni(DNI)).thenReturn(Optional.empty());
         when(pacienteRepository.findByTelefono(TELEFONO)).thenReturn(Optional.empty());
         when(pacienteRepository.findByNumeroAfiliado("123456789")).thenReturn(Optional.empty());

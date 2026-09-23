@@ -78,7 +78,7 @@ class HttpErrorsIntegrationTest {
     }
 
     @Test
-    @WithMockUser
+    @WithMockUser(roles = "PACIENTE")
     void sortDesconocidoDevuelve400YSortPermitidoFunciona() throws Exception {
         mvc.perform(get("/api/turnos").param("sort", "campoInexistente,asc"))
                 .andExpect(status().isBadRequest())

@@ -238,7 +238,7 @@ public class TurnoService {
             .esSobreturned(false)
             .ocupacionActiva(true)
             .build();
-    }public TurnoResponse cambiarEstado
+    }
 
     private void exigirRol(BaseUsuario actor, Rol... permitidos) {
         if (actor == null || !actor.isEnabled() || !List.of(permitidos).contains(actor.getRol())) {
