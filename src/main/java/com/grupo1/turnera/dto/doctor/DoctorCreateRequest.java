@@ -35,4 +35,9 @@ public record DoctorCreateRequest(
         @NotNull(message = "La especialidad es obligatoria")
         Long especialidadId
 ) {
+    public DoctorCreateRequest {
+        if (email != null) {
+            email = email.trim();
+        }
+    }
 }
