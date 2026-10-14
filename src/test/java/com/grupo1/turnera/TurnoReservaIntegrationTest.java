@@ -140,12 +140,14 @@ class TurnoReservaIntegrationTest {
                         .param("doctorId", doctorId.toString())
                         .param("fecha", fecha))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(6)))
-                .andExpect(jsonPath("$[0].doctorId").value(doctorId))
+                // Lunes 09-12 (6 slots) y 14-18 (8 slots) de 30 minutos.
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(14)))
+                .andExpect(jsonPath("$[0].doctor.id").value(doctorId))
                 .andExpect(jsonPath("$[0].fechaHoraInicio").value(
                         proximoLunes9am.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
 
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, proximoLunes9am)))
                 .andExpect(status().isCreated());
@@ -154,7 +156,7 @@ class TurnoReservaIntegrationTest {
                         .param("doctorId", doctorId.toString())
                         .param("fecha", fecha))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(5)))
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(13)))
                 .andExpect(jsonPath("$[0].fechaHoraInicio").value(
                         proximoLunes9am.plusMinutes(30).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
     }
@@ -162,6 +164,7 @@ class TurnoReservaIntegrationTest {
     @Test
     void noPermiteReservarUnaHoraQueNoEsInicioDeSlot() throws Exception {
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, proximoLunes9am.plusMinutes(15))))
                 .andExpect(status().isBadRequest());
@@ -183,9 +186,10 @@ class TurnoReservaIntegrationTest {
                         .param("doctorId", doctorId.toString())
                         .param("fecha", proximoLunes9am.toLocalDate().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(6)));
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(14)));
 
         mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody(pacienteId, doctorId, proximoLunes9am)))
                 .andExpect(status().isCreated());

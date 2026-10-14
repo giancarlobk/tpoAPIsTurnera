@@ -264,8 +264,7 @@ public class GlobalExceptionHandler {
             NumAfiliadoDuplicadoException.class,
             TelefonoDuplicadoException.class,
             MatriculaDuplicadaException.class,
-            EspecialidadDuplicadaException.class,
-            TurnoNoDisponibleException.class
+            EspecialidadDuplicadaException.class
     })
     public ResponseEntity<ApiErrorResponse> handleConflict(
             RuntimeException exception,

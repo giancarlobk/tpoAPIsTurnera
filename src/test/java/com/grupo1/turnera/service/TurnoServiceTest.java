@@ -27,6 +27,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -486,6 +490,48 @@ class TurnoServiceTest {
             never()
     ).saveAndFlush(any());
 }
+
+    @Test
+    void pacienteSoloBuscaSusPropiosTurnos() {
+        Pageable pagina = PageRequest.of(0, 10);
+        when(turnoRepository.buscarConFiltros(2L, 5L, null, null, null, pagina)).thenReturn(Page.empty());
+
+        turnoService.buscarTurnosConFiltros(null, 5L, null, null, null, pagina, paciente(2L));
+
+        verify(turnoRepository).buscarConFiltros(2L, 5L, null, null, null, pagina);
+    }
+
+    @Test
+    void pacienteNoPuedeBuscarTurnosDeOtroPaciente() {
+        assertThatThrownBy(() -> turnoService.buscarTurnosConFiltros(
+                3L, null, null, null, null, PageRequest.of(0, 10), paciente(2L)))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(turnoRepository, never()).buscarConFiltros(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void medicoSoloBuscaTurnosDeSuAgenda() {
+        Pageable pagina = PageRequest.of(0, 10);
+        when(turnoRepository.buscarConFiltros(3L, 1L, null, null, null, pagina)).thenReturn(Page.empty());
+
+        turnoService.buscarTurnosConFiltros(3L, null, null, null, null, pagina, medicoActor());
+
+        verify(turnoRepository).buscarConFiltros(3L, 1L, null, null, null, pagina);
+        assertThatThrownBy(() -> turnoService.buscarTurnosConFiltros(
+                null, 7L, null, null, null, pagina, medicoActor()))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void adminBuscaConLosFiltrosRecibidos() {
+        Pageable pagina = PageRequest.of(0, 10);
+        when(turnoRepository.buscarConFiltros(3L, 7L, null, null, null, pagina)).thenReturn(Page.empty());
+
+        turnoService.buscarTurnosConFiltros(3L, 7L, null, null, null, pagina, adminActor());
+
+        verify(turnoRepository).buscarConFiltros(3L, 7L, null, null, null, pagina);
+    }
 
     private Turno turno(EstadoTurno estado) {
         return Turno.builder().id(10L).doctor(doctorConHorarioLunes9a12())

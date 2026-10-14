@@ -1,11 +1,11 @@
 package com.grupo1.turnera.controller;
 
 import com.grupo1.turnera.dto.admin.DoctorCreateRequest;
-import com.grupo1.turnera.dto.admin.EspecialidadCreateRequest;
 import com.grupo1.turnera.dto.admin.HorarioRequest;
 import com.grupo1.turnera.dto.admin.HorarioResponse;
 import com.grupo1.turnera.dto.doctor.DoctorSummaryResponse;
-import com.grupo1.turnera.model.Especialidad;
+import com.grupo1.turnera.dto.especialidad.EspecialidadCreateRequest;
+import com.grupo1.turnera.dto.especialidad.EspecialidadResponse;
 import com.grupo1.turnera.service.AdministracionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +28,7 @@ public class AdministracionController {
 
     @PostMapping("/especialidades")
     @Operation(summary = "Crear especialidad", description = "Requiere autenticación con rol ADMIN.")
-    public ResponseEntity<Especialidad> crearEspecialidad(@Valid @RequestBody EspecialidadCreateRequest request) {
+    public ResponseEntity<EspecialidadResponse> crearEspecialidad(@Valid @RequestBody EspecialidadCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(administracionService.crearEspecialidad(request));
     }
 

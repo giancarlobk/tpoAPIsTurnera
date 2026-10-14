@@ -1,20 +1,17 @@
 package com.grupo1.turnera.service;
 
 import com.grupo1.turnera.dto.admin.DoctorCreateRequest;
-import com.grupo1.turnera.dto.admin.EspecialidadCreateRequest;
 import com.grupo1.turnera.dto.admin.HorarioRequest;
 import com.grupo1.turnera.dto.admin.HorarioResponse;
 import com.grupo1.turnera.dto.doctor.DoctorSummaryResponse;
+import com.grupo1.turnera.dto.especialidad.EspecialidadCreateRequest;
+import com.grupo1.turnera.dto.especialidad.EspecialidadResponse;
 import com.grupo1.turnera.exception.AgendaInvalidaException;
 import com.grupo1.turnera.exception.RecursoNoEncontradoException;
 import com.grupo1.turnera.model.Doctor;
-import com.grupo1.turnera.model.Especialidad;
 import com.grupo1.turnera.model.HorarioAtencion;
-import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.DoctorRepository;
-import com.grupo1.turnera.repository.EspecialidadRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,37 +25,20 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AdministracionService {
 
-    private final EspecialidadRepository especialidadRepository;
     private final DoctorRepository doctorRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final DoctorService doctorService;
+    private final EspecialidadService especialidadService;
 
+    // Las altas delegan en los mismos servicios que /api/doctores y /api/especialidades
+    // para aplicar las mismas validaciones (email único entre usuarios, duplicados, contraseña).
     @Transactional
-    public Especialidad crearEspecialidad(EspecialidadCreateRequest request) {
-        return especialidadRepository.save(Especialidad.builder()
-                .nombre(request.nombre().trim())
-                .descripcion(request.descripcion())
-                .build());
+    public EspecialidadResponse crearEspecialidad(EspecialidadCreateRequest request) {
+        return especialidadService.crear(request);
     }
 
     @Transactional
     public DoctorSummaryResponse crearDoctor(DoctorCreateRequest request) {
-        Especialidad especialidad = especialidadRepository.findById(request.especialidadId())
-                .orElseThrow(() -> new RecursoNoEncontradoException("Especialidad", request.especialidadId()));
-        Doctor doctor = Doctor.builder()
-                .dni(request.dni().trim())
-                .nombre(request.nombre().trim())
-                .apellido(request.apellido().trim())
-                .email(request.email().trim())
-                .password(passwordEncoder.encode(request.password()))
-                .telefono(request.telefono())
-                .rol(Rol.MEDICO)
-                .activo(true)
-                .matriculaNacional(request.matriculaNacional().trim())
-                .especialidad(especialidad)
-                .build();
-        Doctor guardado = doctorRepository.save(doctor);
-        return new DoctorSummaryResponse(guardado.getId(), guardado.getNombre(), guardado.getApellido(),
-                guardado.getMatriculaNacional(), especialidad.getId(), especialidad.getNombre());
+        return doctorService.registrarDesdeAdministracion(request);
     }
 
     @Transactional

@@ -50,7 +50,7 @@ class OpenApiDocumentationIntegrationTest {
                         .value("integer"))
                 .andExpect(jsonPath("$.paths['/api/turnos'].get.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos'].get.responses['401']").exists())
-                .andExpect(jsonPath("$.paths['/api/turnos'].get.responses['403']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/turnos'].get.responses['403']").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos'].get.responses['500']").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos/disponibles'].get.responses['400']").exists())
                 .andExpect(jsonPath("$.paths['/api/turnos/disponibles'].get.responses['401']").doesNotExist())

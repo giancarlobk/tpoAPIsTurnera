@@ -104,8 +104,11 @@ public class TurnoController {
     @GetMapping
     @ApiResponse(responseCode = "200", description = "Página de turnos filtrados",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = TurnoPageResponse.class)))
+    @ApiResponse(responseCode = "403", description = "Filtro sobre turnos de otro paciente u otra agenda",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
     @Operation(summary = "Buscar turnos por filtros",
-            description = "Requiere autenticación y admite filtros opcionales con paginación.",
+            description = "Admite filtros opcionales con paginación. PACIENTE solo ve sus turnos; "
+                    + "MEDICO solo los de su agenda; ADMIN puede consultar cualquiera.",
             security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Page<TurnoResponse>> buscarTurnos(
             @RequestParam(required = false) Long pacienteId,
@@ -113,8 +116,9 @@ public class TurnoController {
             @RequestParam(required = false) EstadoTurno estado,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaDesde,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaHasta,
-            @PageableDefault(size = 10, page = 0) Pageable pageable) {
+            @PageableDefault(size = 10, page = 0) Pageable pageable,
+            @AuthenticationPrincipal BaseUsuario actor) {
         return ResponseEntity.ok(turnoService.buscarTurnosConFiltros(
-                pacienteId, doctorId, estado, fechaDesde, fechaHasta, pageable));
+                pacienteId, doctorId, estado, fechaDesde, fechaHasta, pageable, actor));
     }
 }
