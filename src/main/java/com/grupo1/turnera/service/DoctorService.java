@@ -5,6 +5,7 @@ import com.grupo1.turnera.dto.doctor.DoctorCreateRequest;
 import com.grupo1.turnera.exception.DniDuplicadoException;
 import com.grupo1.turnera.exception.MatriculaDuplicadaException;
 import com.grupo1.turnera.exception.RecursoNoEncontradoException;
+import com.grupo1.turnera.exception.TelefonoDuplicadoException;
 import com.grupo1.turnera.model.Doctor;
 import com.grupo1.turnera.model.Especialidad;
 import com.grupo1.turnera.model.enums.Rol;
@@ -40,11 +41,27 @@ public class DoctorService {
 
     @Transactional
     public DoctorSummaryResponse registrar(DoctorCreateRequest request) {
-        passwordPolicyValidator.validateForEncoding(request.password());
+        return crear(request.dni(), request.nombre(), request.apellido(), request.email(),
+                request.password(), null, request.matriculaNacional(), request.especialidadId());
+    }
 
-        String dni = request.dni().trim();
-        String email = emailUnicidadService.normalizar(request.email());
-        String matricula = request.matriculaNacional().trim();
+    /** Alta desde /api/admin/doctores: mismas validaciones que el alta común, más el teléfono opcional. */
+    @Transactional
+    public DoctorSummaryResponse registrarDesdeAdministracion(
+            com.grupo1.turnera.dto.admin.DoctorCreateRequest request) {
+        return crear(request.dni(), request.nombre(), request.apellido(), request.email(),
+                request.password(), request.telefono(), request.matriculaNacional(), request.especialidadId());
+    }
+
+    private DoctorSummaryResponse crear(String dniRecibido, String nombre, String apellido, String emailRecibido,
+                                        String password, String telefonoRecibido, String matriculaRecibida,
+                                        Long especialidadId) {
+        passwordPolicyValidator.validateForEncoding(password);
+
+        String dni = dniRecibido.trim();
+        String email = emailUnicidadService.normalizar(emailRecibido);
+        String matricula = matriculaRecibida.trim();
+        String telefono = telefonoRecibido == null || telefonoRecibido.isBlank() ? null : telefonoRecibido.trim();
 
         if (doctorRepository.findByDni(dni).isPresent()) {
             throw new DniDuplicadoException(dni);
@@ -52,18 +69,22 @@ public class DoctorService {
         if (doctorRepository.findByMatriculaNacional(matricula).isPresent()) {
             throw new MatriculaDuplicadaException(matricula);
         }
+        if (telefono != null && doctorRepository.findByTelefono(telefono).isPresent()) {
+            throw new TelefonoDuplicadoException(telefono);
+        }
 
-        Especialidad especialidad = especialidadRepository.findById(request.especialidadId())
-                .orElseThrow(() -> new RecursoNoEncontradoException("Especialidad", request.especialidadId()));
+        Especialidad especialidad = especialidadRepository.findById(especialidadId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("Especialidad", especialidadId));
 
         emailUnicidadService.reservar(email);
 
         Doctor doctor = Doctor.builder()
                 .dni(dni)
-                .nombre(request.nombre().trim())
-                .apellido(request.apellido().trim())
+                .nombre(nombre.trim())
+                .apellido(apellido.trim())
                 .email(email)
-                .password(passwordEncoder.encode(request.password()))
+                .password(passwordEncoder.encode(password))
+                .telefono(telefono)
                 .rol(Rol.MEDICO)
                 .activo(true)
                 .matriculaNacional(matricula)

@@ -24,6 +24,8 @@ public interface DoctorRepository extends JpaRepository<Doctor, Long> {
 
         Optional<Doctor> findByMatriculaNacional(String matriculaNacional);
 
+        Optional<Doctor> findByTelefono(String telefono);
+
     @Query("""
             SELECT d
             FROM Doctor d
