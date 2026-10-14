@@ -10,6 +10,8 @@ import com.grupo1.turnera.repository.DoctorRepository;
 import com.grupo1.turnera.repository.EspecialidadRepository;
 import com.grupo1.turnera.repository.PacienteRepository;
 import com.grupo1.turnera.repository.TurnoRepository;
+import com.grupo1.turnera.security.JwtUtil;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,10 +52,14 @@ class TurnoConcurrencyIntegrationTest {
     private TurnoRepository turnoRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private JwtUtil jwtUtil;
 
     private Long doctorId;
-    private Long pacienteUnoId;
-    private Long pacienteDosId;
+    private Long especialidadId;
+    private List<Long> pacienteIds;
+    private String tokenPacienteUno;
+    private String tokenPacienteDos;
     private LocalDateTime inicio;
 
     @BeforeEach
@@ -78,18 +84,32 @@ class TurnoConcurrencyIntegrationTest {
         Paciente pacienteDos = pacienteRepository.saveAndFlush(paciente("Dos", "302" + Math.abs(System.nanoTime() % 10000000)));
 
         doctorId = doctor.getId();
-        pacienteUnoId = pacienteUno.getId();
-        pacienteDosId = pacienteDos.getId();
+        especialidadId = especialidad.getId();
+        pacienteIds = List.of(pacienteUno.getId(), pacienteDos.getId());
+        tokenPacienteUno = jwtUtil.generateToken(pacienteUno);
+        tokenPacienteDos = jwtUtil.generateToken(pacienteDos);
         LocalDate lunes = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY));
         inicio = LocalDateTime.of(lunes, LocalTime.of(9, 0));
+    }
+
+    // Este test no es transaccional (las reservas corren en otros hilos), así que borra lo que commiteó
+    // para no afectar a los demás tests que comparten la misma base H2.
+    @AfterEach
+    void limpiar() {
+        turnoRepository.deleteAll(turnoRepository.findAll().stream()
+                .filter(turno -> turno.getDoctor().getId().equals(doctorId))
+                .toList());
+        pacienteRepository.deleteAllById(pacienteIds);
+        doctorRepository.deleteById(doctorId);
+        especialidadRepository.deleteById(especialidadId);
     }
 
     @Test
     void dosReservasSimultaneasConfirmanUnaSola() throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<Integer> primera = executor.submit(() -> reservar(pacienteUnoId));
-            Future<Integer> segunda = executor.submit(() -> reservar(pacienteDosId));
+            Future<Integer> primera = executor.submit(() -> reservar(tokenPacienteUno));
+            Future<Integer> segunda = executor.submit(() -> reservar(tokenPacienteDos));
 
             List<Integer> estados = List.of(primera.get(), segunda.get());
             assertThat(estados).containsExactlyInAnyOrder(201, 409);
@@ -99,12 +119,14 @@ class TurnoConcurrencyIntegrationTest {
         }
     }
 
-    private int reservar(Long pacienteId) throws Exception {
+    private int reservar(String token) throws Exception {
+        // El paciente sale del JWT; el body solo lleva médico y horario.
         return mockMvc.perform(post("/api/turnos/reservar")
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"pacienteId":%d,"doctorId":%d,"fechaHoraInicio":"%s"}
-                                """.formatted(pacienteId, doctorId, inicio)))
+                                {"doctor":{"id":%d},"fechaHoraInicio":"%s"}
+                                """.formatted(doctorId, inicio)))
                 .andReturn().getResponse().getStatus();
     }
 
