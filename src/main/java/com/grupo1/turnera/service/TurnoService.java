@@ -119,7 +119,7 @@ public class TurnoService {
     public TurnoResponse cambiarEstado(Long turnoId, CambioEstadoTurnoRequest request, BaseUsuario actor) {
         exigirRol(actor, Rol.PACIENTE, Rol.MEDICO, Rol.ADMIN);
         Turno turno = turnoRepository.findByIdForUpdate(turnoId)
-                .orElseThrow(() -> new RecursoNoEncontradoException("T urno", turnoId));
+                .orElseThrow(() -> new RecursoNoEncontradoException("Turno", turnoId));
         EstadoTurno estadoAnterior = turno.getEstado();
         EstadoTurno estadoNuevo = request.estadoDestino();
         validarActorSobreTurno(turno, actor, estadoNuevo);
@@ -226,7 +226,20 @@ public class TurnoService {
     @Transactional(readOnly = true)
     public Page<TurnoResponse> buscarTurnosConFiltros(
             Long pacienteId, Long doctorId, EstadoTurno estado,
-            LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable) {
+            LocalDateTime fechaDesde, LocalDateTime fechaHasta, Pageable pageable, BaseUsuario actor) {
+        exigirRol(actor, Rol.PACIENTE, Rol.MEDICO, Rol.ADMIN);
+        // PACIENTE solo ve sus turnos y MEDICO solo su agenda; ADMIN puede filtrar libremente.
+        if (actor.getRol() == Rol.PACIENTE) {
+            if (pacienteId != null && !pacienteId.equals(actor.getId())) {
+                throw new AccessDeniedException("El paciente solo puede consultar sus propios turnos");
+            }
+            pacienteId = actor.getId();
+        } else if (actor.getRol() == Rol.MEDICO) {
+            if (doctorId != null && !doctorId.equals(actor.getId())) {
+                throw new AccessDeniedException("El médico solo puede consultar su propia agenda");
+            }
+            doctorId = actor.getId();
+        }
         pageable.getSort().forEach(order -> {
             if (!CAMPOS_ORDENAMIENTO.contains(order.getProperty())) {
                 throw new ArgumentoInvalidoException(
