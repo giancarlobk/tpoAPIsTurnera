@@ -48,14 +48,12 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/auth/login` | Autentica y emite un JWT para un usuario activo. | `email`, `password` | `200`, `400`, `401` |
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
-| `POST` | `/api/admin/especialidades` | Crea una especialidad. Requiere `ADMIN` por HTTP Basic. | Nombre y descripción | `201`, `400`, `401`, `403` |
-| `POST` | `/api/admin/doctores` | Crea un médico asociado a una especialidad. Requiere `ADMIN`. | Datos personales, matrícula y especialidad | `201`, `400`, `401`, `403`, `404` |
+| `POST` | `/api/admin/especialidades` | Crea una especialidad. Requiere `ADMIN`. | Nombre y descripción | `201`, `400`, `401`, `403`, `409` |
+| `POST` | `/api/admin/doctores` | Crea un médico asociado a una especialidad. Requiere `ADMIN`. | Datos personales, matrícula y especialidad | `201`, `400`, `401`, `403`, `404`, `409` |
 | `PUT` | `/api/admin/doctores/{id}/horarios` | Reemplaza la agenda completa del médico. Requiere `ADMIN`. | Lista de franjas | `200`, `400`, `401`, `403`, `404` |
-| `POST` | `/api/turnos/reservar` | Persiste la reserva de un turno regular. | Doctor, paciente, horario y estado | `200` |
-| `POST` | `/api/turnos/sobreturno` | Persiste un sobreturno con su justificación. | Datos del turno y justificación | `201` |
 | `GET` | `/api/especialidades` | Consulta el catálogo público. | Sin cuerpo | `200` con `List<EspecialidadResponse>` |
 | `GET` | `/api/turnos/disponibles` | Calcula slots desde la agenda y excluye reservas activas. | Query opcional: `doctorId`, `fecha` (`YYYY-MM-DD`) | `200` con `List<TurnoDisponibleResponse>`, `400`, `500` |
-| `GET` | `/api/turnos` | Busca turnos con filtros y paginación. | Query opcional: `pacienteId`, `doctorId`, `estado`, `fechaDesde`, `fechaHasta`, `page`, `size`, `sort` | `200` con `Page<TurnoResponse>`, `400`, `401`, `500` |
+| `GET` | `/api/turnos` | Busca turnos con filtros y paginación. PACIENTE ve solo los suyos y MEDICO solo su agenda. | Query opcional: `pacienteId`, `doctorId`, `estado`, `fechaDesde`, `fechaHasta`, `page`, `size`, `sort` | `200` con `Page<TurnoResponse>`, `400`, `401`, `403`, `500` |
 | `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
 | `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
 | `PATCH` | `/api/turnos/{turnoId}/estado` | Cambia el estado con autorización e historial. | Estado destino y motivo opcional/obligatorio según transición | `200`, `400`, `401`, `403`, `404`, `409`, `500` |
@@ -250,13 +248,13 @@ docker compose up --build
 
 El bootstrap es idempotente: solo crea el administrador si la tabla no contiene ninguno. Después del primer arranque se debe establecer `TURNERA_BOOTSTRAP_ADMIN_ENABLED=false` y reiniciar. La contraseña se almacena con BCrypt.
 
-Con las credenciales del administrador, usar HTTP Basic en Swagger o en cada request:
+Autenticar al administrador con `POST /api/auth/login` y enviar el JWT como `Authorization: Bearer <token>` (en Swagger, con **Authorize**) en cada request:
 
 1. `POST /api/admin/especialidades` con `{"nombre":"Clínica Médica","descripcion":"Atención clínica"}` y guardar el `id`.
 2. `POST /api/admin/doctores` con datos del médico, una contraseña propia y el `especialidadId`; guardar el `id`.
 3. `PUT /api/admin/doctores/{id}/horarios` con, por ejemplo, `[ {"diaSemana":"LUNES","horaInicio":"09:00:00","horaFin":"12:00:00","duracionTurnoMinutos":30} ]`.
 4. Registrar un paciente con `POST /api/pacientes` y autenticarlo con `POST /api/auth/login`.
-5. Reservar con `POST /api/turnos/reservar`, usando el id del paciente, el id del médico y una fecha futura que caiga el lunes entre las 09:00 y las 11:30.
+5. Reservar con `POST /api/turnos/reservar` usando el JWT del paciente (el servidor toma el paciente del token), el id del médico y una fecha futura que caiga el lunes entre las 09:00 y las 11:30.
 
 Las operaciones administrativas no tienen registro público: `/api/admin/**` responde `401` sin credenciales y `403` para pacientes o médicos. La creación de administradores no se expone como endpoint.
 
@@ -304,7 +302,7 @@ Para Docker, guardar una clave generada de la misma forma como `JWT_SECRET=<valo
 | `GET /api/doctores`, `GET /api/especialidades` | Público: catálogo para elegir profesional |
 | `POST /api/doctores`, `POST /api/especialidades` | ADMIN: altas administrativas |
 | `GET /api/turnos/disponibles` | Público: horarios e id del médico, sin datos de pacientes |
-| `GET /api/turnos` | Cualquier usuario autenticado: búsqueda paginada |
+| `GET /api/turnos` | Autenticado: PACIENTE solo sus turnos, MEDICO solo su agenda, ADMIN cualquiera. Filtrar por otro paciente u otra agenda responde `403` |
 | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | Público: documentación de la API |
 | `POST /api/turnos/reservar` | PACIENTE: reserva exclusivamente para sí mismo |
 | `POST /api/turnos/sobreturno` | MEDICO: su propia agenda; ADMIN: cualquier médico activo |
