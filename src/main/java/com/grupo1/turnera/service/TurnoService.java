@@ -26,6 +26,8 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.time.Clock;
+
 
 
 @Service
@@ -37,6 +39,8 @@ public class TurnoService {
     private final TurnoRepository turnoRepository;
     private final DoctorRepository doctorRepository;
     private final PacienteRepository pacienteRepository;
+    private final Clock clock;
+
 
     @Transactional
     public TurnoResponse reservarTurno(ReservaTurnoRequest request, BaseUsuario actor) {
@@ -69,7 +73,7 @@ public class TurnoService {
         Turno turno = nuevoTurno(doctor, paciente, inicio, fin);
         turno.getHistorialEstados().add(HistorialEstadoTurno.builder()
                 .turno(turno).estadoAnterior(EstadoTurno.RESERVADO).estadoNuevo(EstadoTurno.RESERVADO)
-                .fechaCambio(LocalDateTime.now()).usuarioIdModificador(paciente.getId())
+                .fechaCambio(LocalDateTime.now(clock)).usuarioIdModificador(paciente.getId())
                 .rolUsuarioModificador(Rol.PACIENTE).build());
         try {
             return TurnoResponse.fromEntity(turnoRepository.saveAndFlush(turno));
@@ -95,7 +99,7 @@ public class TurnoService {
         }
         Doctor doctor = doctorActivo(doctorId);
         Paciente paciente = pacienteRepository.findById(request.paciente().id()).filter(p -> p.isEnabled()&& p.getRol() == Rol.PACIENTE).orElseThrow(() -> new RecursoNoEncontradoException("Paciente",request.paciente().id()));
-        if (!request.fechaHoraInicio().isAfter(LocalDateTime.now())) {
+        if (!request.fechaHoraInicio().isAfter(LocalDateTime.now(clock))) {
             throw new ArgumentoInvalidoException("La fecha y hora de inicio deben ser futuras");
         }
         if (!request.fechaHoraFin().isAfter(request.fechaHoraInicio())) {
@@ -110,80 +114,147 @@ public class TurnoService {
         turno.setJustificacionSobreturned(justificacion);
         turno.getHistorialEstados().add(HistorialEstadoTurno.builder()
                 .turno(turno).estadoAnterior(EstadoTurno.RESERVADO).estadoNuevo(EstadoTurno.RESERVADO)
-                .fechaCambio(LocalDateTime.now()).usuarioIdModificador(actor.getId())
+                .fechaCambio(LocalDateTime.now(clock)).usuarioIdModificador(actor.getId())
                 .rolUsuarioModificador(actor.getRol()).motivo(justificacion).build());
         return TurnoResponse.fromEntity(turnoRepository.saveAndFlush(turno));
     }
 
-    @Transactional
-    public TurnoResponse cambiarEstado(Long turnoId, CambioEstadoTurnoRequest request, BaseUsuario actor) {
-        exigirRol(actor, Rol.PACIENTE, Rol.MEDICO, Rol.ADMIN);
-        Turno turno = turnoRepository.findByIdForUpdate(turnoId)
-                .orElseThrow(() -> new RecursoNoEncontradoException("Turno", turnoId));
-        EstadoTurno estadoAnterior = turno.getEstado();
-        EstadoTurno estadoNuevo = request.estadoDestino();
-        validarActorSobreTurno(turno, actor, estadoNuevo);
-        if (!transicionPermitida(estadoAnterior, estadoNuevo)) {
-            throw new TransicionEstadoTurnoInvalidaException(
-                    "No se permite cambiar el turno de " + estadoAnterior + " a " + estadoNuevo);
-        }
-        String motivo = request.motivo() == null ? null : request.motivo().trim();
-        if ((estadoNuevo == EstadoTurno.AUSENTE
-                || estadoNuevo == EstadoTurno.CANCELADO_PACIENTE
-                || estadoNuevo == EstadoTurno.CANCELADO_MEDICO)
-                && (motivo == null || motivo.isEmpty())) {
-            throw new ArgumentoInvalidoException(
-                    "El motivo es obligatorio para ausencias y cancelaciones");
-        }
-        turno.setEstado(estadoNuevo);
-        if (estadoNuevo == EstadoTurno.CANCELADO_PACIENTE
-        || estadoNuevo == EstadoTurno.CANCELADO_MEDICO) {
-            turno.setOcupacionActiva(null);
-        }
-        turno.getHistorialEstados().add(HistorialEstadoTurno.builder()
-                .turno(turno).estadoAnterior(estadoAnterior).estadoNuevo(estadoNuevo)
-                .fechaCambio(LocalDateTime.now()).usuarioIdModificador(actor.getId())
-                .rolUsuarioModificador(actor.getRol()).motivo(motivo).build());
-        return TurnoResponse.fromEntity(turnoRepository.saveAndFlush(turno));
+
+@Transactional
+public TurnoResponse cambiarEstado(Long turnoId,CambioEstadoTurnoRequest request,BaseUsuario actor) {
+
+    
+private void validarReglasTemporales(
+        Turno turno,
+        EstadoTurno estadoNuevo) {
+
+    LocalDateTime ahora = LocalDateTime.now(clock);
+
+    LocalDateTime inicio = turno.getFechaHoraInicio();
+    LocalDateTime fin = turno.getFechaHoraFin();
+
+    // Verificar que el intervalo sea válido.
+    if (inicio == null || fin == null
+            || !fin.isAfter(inicio)) {
+        throw new TransicionEstadoTurnoInvalidaException(
+                "El turno tiene un intervalo horario inválido");
     }
 
-    private boolean transicionPermitida(EstadoTurno anterior, EstadoTurno nuevo) {
-        return switch (anterior) {
-            case RESERVADO -> nuevo == EstadoTurno.CONFIRMADO
-                    || nuevo == EstadoTurno.CANCELADO_PACIENTE
-                    || nuevo == EstadoTurno.CANCELADO_MEDICO;
-            case CONFIRMADO -> nuevo == EstadoTurno.ATENDIDO
-                    || nuevo == EstadoTurno.AUSENTE
-                    || nuevo == EstadoTurno.CANCELADO_PACIENTE
-                    || nuevo == EstadoTurno.CANCELADO_MEDICO;
-            default -> false;
-        };
-    }
+    boolean antesDelInicio = ahora.isBefore(inicio);
+    boolean finalizado = !ahora.isBefore(fin);
 
-    private void validarActorSobreTurno(Turno turno, BaseUsuario actor, EstadoTurno estadoNuevo) {
-        if (actor.getRol() == Rol.ADMIN) {
-            return;
-        }
-        if (actor.getRol() == Rol.PACIENTE) {
-            if (!turno.getPaciente().getId().equals(actor.getId())
-                    || estadoNuevo != EstadoTurno.CANCELADO_PACIENTE) {
-                throw new AccessDeniedException("El paciente solo puede cancelar sus propios turnos");
+    switch (estadoNuevo) {
+
+        case CONFIRMADO -> {
+            // Solo se puede confirmar antes del inicio.
+            if (!antesDelInicio) {
+                throw new TransicionEstadoTurnoInvalidaException(
+                        "No se puede confirmar un turno "
+                                + "que ya comenzó");
             }
-            return;
         }
-        if (!turno.getDoctor().getId().equals(actor.getId())) {
-            throw new AccessDeniedException("El médico solo puede modificar su propia agenda");
+
+        case ATENDIDO -> {
+            // Debe haber terminado el turno.
+            if (!finalizado) {
+                throw new TransicionEstadoTurnoInvalidaException(
+                        "No se puede marcar ATENDIDO "
+                                + "antes de finalizar el turno");
+            }
         }
-        if (estadoNuevo == EstadoTurno.CANCELADO_PACIENTE) {
-            throw new AccessDeniedException("El médico no puede cancelar como paciente");
+
+        case AUSENTE -> {
+            // No se puede registrar ausencia antes del fin.
+            if (!finalizado) {
+                throw new TransicionEstadoTurnoInvalidaException(
+                        "No se puede marcar AUSENTE "
+                                + "antes de finalizar el turno");
+            }
+        }
+
+        case CANCELADO_PACIENTE, CANCELADO_MEDICO -> {
+            // La cancelación solo se admite antes del inicio.
+            if (!antesDelInicio) {
+                throw new TransicionEstadoTurnoInvalidaException(
+                        "No se puede cancelar un turno "
+                                + "que ya comenzó o finalizó");
+            }
+        }
+
+        default -> {
+            // Los demás estados no incorporan reglas
+            // temporales adicionales aquí.
         }
     }
+}
+
+
+    // 1. Validar el rol del usuario.
+    exigirRol(actor, Rol.PACIENTE, Rol.MEDICO, Rol.ADMIN);
+
+    // 2. Buscar el turno con bloqueo de escritura.
+    Turno turno = turnoRepository.findByIdForUpdate(turnoId)
+            .orElseThrow(() ->
+                    new RecursoNoEncontradoException("Turno", turnoId));
+
+    EstadoTurno estadoAnterior = turno.getEstado();
+    EstadoTurno estadoNuevo = request.estadoDestino();
+
+    // 3. Validar permisos del usuario.
+    validarActorSobreTurno(turno, actor, estadoNuevo);
+
+    // 4. Comprobar la transición entre estados.
+    if (!transicionPermitida(estadoAnterior, estadoNuevo)) {
+        throw new TransicionEstadoTurnoInvalidaException("No se permite cambiar el turno de " + estadoAnterior + " a " + estadoNuevo);
+    }
+
+    // 5. Validar las reglas temporales.
+    validarReglasTemporales(turno, estadoNuevo);
+
+    // 6. Mantener la validación del motivo.
+    String motivo = request.motivo() == null
+            ? null
+            : request.motivo().trim();
+
+    if ((estadoNuevo == EstadoTurno.AUSENTE
+            || estadoNuevo == EstadoTurno.CANCELADO_PACIENTE
+            || estadoNuevo == EstadoTurno.CANCELADO_MEDICO)
+            && (motivo == null || motivo.isEmpty())) {
+
+        throw new ArgumentoInvalidoException("El motivo es obligatorio para ausencias " + "y cancelaciones");
+    }
+
+    // 7. Modificar el estado solo después de validar.
+    turno.setEstado(estadoNuevo);
+
+    if (estadoNuevo == EstadoTurno.CANCELADO_PACIENTE
+            || estadoNuevo == EstadoTurno.CANCELADO_MEDICO) {
+        turno.setOcupacionActiva(null);
+    }
+
+    // 8. Registrar el cambio en el historial.
+    turno.getHistorialEstados().add(
+            HistorialEstadoTurno.builder()
+                    .turno(turno)
+                    .estadoAnterior(estadoAnterior)
+                    .estadoNuevo(estadoNuevo)
+                    .fechaCambio(LocalDateTime.now(clock))
+                    .usuarioIdModificador(actor.getId())
+                    .rolUsuarioModificador(actor.getRol())
+                    .motivo(motivo)
+                    .build()
+    );
+
+    // 9. Guardar y devolver la respuesta.
+    return TurnoResponse.fromEntity(turnoRepository.saveAndFlush(turno));
+}
+
 
     @Transactional(readOnly = true)
     public List<TurnoDisponibleResponse> obtenerDisponibles(Long doctorId, LocalDate fecha) {
-        LocalDate desde = fecha == null ? LocalDate.now() : fecha;
+        LocalDate desde = fecha == null ? LocalDate.now(clock) : fecha;
         LocalDate hasta = fecha == null ? desde.plusDays(30) : desde.plusDays(1);
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = LocalDateTime.now(clock);
         List<Doctor> doctores = doctorId == null
                 ? doctorRepository.findAll()
                 : doctorRepository.findById(doctorId).map(List::of).orElse(List.of());
