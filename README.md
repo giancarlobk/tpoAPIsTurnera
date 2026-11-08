@@ -183,6 +183,52 @@ La matriz permitida es:
 
 `PACIENTE` solo puede cancelar sus propios turnos como `CANCELADO_PACIENTE`; `MEDICO` puede modificar turnos de su agenda y `ADMIN` cualquier turno. El motivo es obligatorio para `AUSENTE` y cualquier cancelación. Todo cambio responde `200` con `TurnoResponse` y agrega al historial el estado anterior, estado nuevo, fecha, actor, rol y motivo. Devuelve `400` por request inválido, `401` sin JWT, `403` sin permisos, `404` si el turno no existe y `409` si la transición no está en la matriz.
 
+
+## Reglas temporales para cambios de estado
+
+El sistema valida las transiciones de estado de acuerdo
+con la fecha y hora real de cada turno.
+
+### Política temporal
+
+- CONFIRMADO: solo antes del inicio del turno.
+- ATENDIDO: desde la finalización del turno.
+- AUSENTE: desde la finalización del turno.
+- CANCELADO_PACIENTE: solo antes del inicio.
+- CANCELADO_MEDICO: solo antes del inicio.
+
+### Límites
+
+- Antes: ahora < inicio.
+- Durante: inicio <= ahora < fin.
+- Después: ahora >= fin.
+
+Las reglas temporales se aplican además de las
+transiciones de estado y los permisos existentes.
+
+### Manejo de errores
+
+- 200: transición realizada correctamente.
+- 400: solicitud o motivo inválido.
+- 403: usuario sin permisos.
+- 404: turno inexistente.
+- 409: transición de estado o temporal no permitida.
+
+### Historial
+
+El historial se actualiza únicamente después de que
+se hayan superado las validaciones.
+
+### Pruebas
+
+Se utiliza java.time.Clock para controlar el tiempo
+en las pruebas unitarias.
+
+Ejecutar:
+
+./mvnw test
+
+
 ## Inicio rápido
 
 ### Requisitos
