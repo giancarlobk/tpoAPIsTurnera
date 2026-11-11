@@ -56,13 +56,7 @@ public class TurnoService {
         }
 
         LocalDateTime inicio = request.fechaHoraInicio();
-        HorarioAtencion horario = buscarHorario(doctor, inicio)
-                .orElseThrow(() -> new TurnoFueraDeHorarioException(doctor.getId(), inicio.toString()));
-        LocalDateTime fin = inicio.plusMinutes(horario.getDuracionTurnoMinutos());
-        
-        if (turnoRepository.existsSolapamiento(doctor.getId(), inicio, fin)) {
-            throw new TurnoNoDisponibleException(doctor.getId(), inicio);
-        }
+        LocalDateTime fin = validarSlotDisponible(doctor, inicio);
 
         turnoRepository.findLegacyDisponible(doctor.getId(), inicio)
                 .ifPresent(legacy -> {
@@ -80,6 +74,21 @@ public class TurnoService {
         } catch (DataIntegrityViolationException exception) {
             throw new TurnoNoDisponibleException(doctor.getId(), inicio);
         }
+    }
+
+    /**
+     * Valida que el inicio sea un slot de la agenda del médico y que esté libre; devuelve el fin del turno.
+     * La usan la reserva y el carrito, así los dos aplican las mismas reglas.
+     */
+    public LocalDateTime validarSlotDisponible(Doctor doctor, LocalDateTime inicio) {
+        HorarioAtencion horario = buscarHorario(doctor, inicio)
+                .orElseThrow(() -> new TurnoFueraDeHorarioException(doctor.getId(), inicio.toString()));
+        LocalDateTime fin = inicio.plusMinutes(horario.getDuracionTurnoMinutos());
+
+        if (turnoRepository.existsSolapamiento(doctor.getId(), inicio, fin)) {
+            throw new TurnoNoDisponibleException(doctor.getId(), inicio);
+        }
+        return fin;
     }
 
     @Transactional
