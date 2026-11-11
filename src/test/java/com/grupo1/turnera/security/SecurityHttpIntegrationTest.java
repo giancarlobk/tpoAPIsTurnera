@@ -201,8 +201,18 @@ class SecurityHttpIntegrationTest {
         var disponibles = send("GET", "/api/turnos/disponibles", null, null);
         assertThat(disponibles.statusCode()).isEqualTo(200);
         assertThat(json(disponibles).isArray()).isTrue();
-        assertThat(json(disponibles).size()).isEqualTo(1);
-        assertThat(json(disponibles).get(0).path("doctor").path("id").asLong()).isEqualTo(medico.getId());
+        // La disponibilidad se calcula a partir del horario del médico (martes de 9 a 12, turnos de 30 min)
+        // para los próximos 30 días, así que siempre hay al menos un martes con turnos libres.
+        assertThat(json(disponibles).size()).isPositive();
+        for (JsonNode slot : json(disponibles)) {
+            assertThat(slot.path("doctor").path("id").asLong()).isEqualTo(medico.getId());
+            LocalDateTime inicio = LocalDateTime.parse(slot.path("fechaHoraInicio").asText());
+            LocalDateTime fin = LocalDateTime.parse(slot.path("fechaHoraFin").asText());
+            assertThat(inicio.getDayOfWeek()).isEqualTo(DayOfWeek.TUESDAY);
+            assertThat(inicio.toLocalTime()).isBetween(LocalTime.of(9, 0), LocalTime.of(11, 30));
+            assertThat(inicio.getMinute() % 30).isZero();
+            assertThat(fin).isEqualTo(inicio.plusMinutes(30));
+        }
         assertThat(json(disponibles).get(0).propertyNames()).containsExactlyInAnyOrderElementsOf(
                 contrato.at("/components/schemas/TurnoDisponibleResponse/properties").propertyNames());
         assertThat(disponibles.body()).doesNotContain("paciente", "historiaClinica", "password");
