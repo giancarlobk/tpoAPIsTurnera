@@ -138,8 +138,8 @@ class SecurityHttpIntegrationTest {
         assertThat(historial).hasSize(1);
         assertThat(historial.get(0).getMotivo()).isEqualTo("Control adicional");
         var adminRequest = sobreturno();
-        adminRequest.put("fechaHoraInicio", "2030-01-01T10:30:00");
-        adminRequest.put("fechaHoraFin", "2030-01-01T11:00:00");
+        adminRequest.put("fechaHoraInicio", iso(proximoMartesA(10, 30)));
+        adminRequest.put("fechaHoraFin", iso(proximoMartesA(11, 0)));
         var adminResponse = send("POST", "/api/turnos/sobreturno", adminRequest, adminToken);
         assertThat(adminResponse.statusCode()).isEqualTo(201);
         assertThat(turnos.count()).isEqualTo(2);
@@ -196,8 +196,8 @@ class SecurityHttpIntegrationTest {
         assertError(send("GET", "/api/turnos", null, null), 401, "/api/turnos");
 
         turnos.saveAndFlush(Turno.builder().doctor(medico).estado(EstadoTurno.DISPONIBLE)
-                .fechaHoraInicio(LocalDateTime.of(2030, 1, 1, 11, 0))
-                .fechaHoraFin(LocalDateTime.of(2030, 1, 1, 11, 30)).build());
+                .fechaHoraInicio(proximoMartesA(11, 0))
+                .fechaHoraFin(proximoMartesA(11, 30)).build());
         var disponibles = send("GET", "/api/turnos/disponibles", null, null);
         assertThat(disponibles.statusCode()).isEqualTo(200);
         assertThat(json(disponibles).isArray()).isTrue();
@@ -292,8 +292,8 @@ class SecurityHttpIntegrationTest {
     @Test
     void consultasPublicasYSwaggerAccesiblesSinTokenNiDatosPrivados() throws Exception {
         turnos.saveAndFlush(Turno.builder().doctor(medico).estado(EstadoTurno.DISPONIBLE)
-                .fechaHoraInicio(LocalDateTime.of(2030, 1, 1, 10, 0))
-                .fechaHoraFin(LocalDateTime.of(2030, 1, 1, 10, 30)).build());
+                .fechaHoraInicio(proximoMartesA(10, 0))
+                .fechaHoraFin(proximoMartesA(10, 30)).build());
         for (String path : List.of("/api/doctores", "/api/especialidades", "/api/turnos/disponibles", "/v3/api-docs", "/swagger-ui/index.html")) {
             var response = send("GET", path, null, null);
             assertThat(response.statusCode()).as(path).isEqualTo(200);
@@ -405,7 +405,21 @@ void reservaSinJwtContinuaRespondiendo401()
 
     private HashMap<String, Object> reserva() {
         return new HashMap<>(Map.of("doctor", Map.of("id", medico.getId()),
-                "fechaHoraInicio", "2030-01-01T10:00:00", "fechaHoraFin", "2030-01-01T10:30:00"));
+                "fechaHoraInicio", iso(proximoMartesA(10, 0)), "fechaHoraFin", iso(proximoMartesA(10, 30))));
+    }
+
+    /**
+     * Fechas relativas en lugar de fechas fijas: el médico de prueba atiende los martes de 9 a 12,
+     * así que se usa el próximo martes según la zona horaria de la aplicación (ClockConfig).
+     */
+    private static LocalDateTime proximoMartesA(int hora, int minuto) {
+        return LocalDate.now(ZoneId.of("America/Argentina/Buenos_Aires"))
+                .with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.TUESDAY))
+                .atTime(hora, minuto);
+    }
+
+    private static String iso(LocalDateTime fechaHora) {
+        return fechaHora.format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
     private HashMap<String, Object> sobreturno() {
