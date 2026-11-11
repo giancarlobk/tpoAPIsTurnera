@@ -20,10 +20,10 @@ import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.DoctorRepository;
 import com.grupo1.turnera.repository.PacienteRepository;
 import com.grupo1.turnera.repository.TurnoRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,9 +32,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
@@ -56,8 +58,13 @@ class TurnoServiceTest {
     @Mock
     private PacienteRepository pacienteRepository;
 
-    @InjectMocks
     private TurnoService turnoService;
+
+    @BeforeEach
+    void crearServicio() {
+        // TurnoService recibe el reloj por constructor; por defecto usamos la hora real.
+        turnoService = servicioConReloj(Clock.systemDefaultZone());
+    }
 
     @Test
     void deberiaReservarUnTurnoValidoYRegistrarElHistorialInicial() {
@@ -248,6 +255,12 @@ class TurnoServiceTest {
         for (EstadoTurno destino : List.of(EstadoTurno.ATENDIDO, EstadoTurno.AUSENTE,
                 EstadoTurno.CANCELADO_MEDICO)) {
             Turno turno = turno(EstadoTurno.CONFIRMADO);
+            // Reglas temporales: ATENDIDO y AUSENTE exigen que el turno haya terminado;
+            // la cancelación exige que todavía no haya empezado.
+            LocalDateTime momento = destino == EstadoTurno.CANCELADO_MEDICO
+                    ? turno.getFechaHoraInicio().minusHours(1)
+                    : turno.getFechaHoraFin().plusMinutes(1);
+            turnoService = servicioConReloj(relojEn(momento));
             when(turnoRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(turno));
             when(turnoRepository.saveAndFlush(any(Turno.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -611,6 +624,15 @@ class TurnoServiceTest {
 
     private ReservaTurnoRequest reserva(LocalDateTime inicio) {
         return new ReservaTurnoRequest(new UsuarioReferencia(1L), inicio);
+    }
+
+    private TurnoService servicioConReloj(Clock clock) {
+        return new TurnoService(turnoRepository, doctorRepository, pacienteRepository, clock);
+    }
+
+    private Clock relojEn(LocalDateTime momento) {
+        ZoneId zona = ZoneId.systemDefault();
+        return Clock.fixed(momento.atZone(zona).toInstant(), zona);
     }
 
     private LocalDateTime proximoLunesA(LocalTime hora) {
