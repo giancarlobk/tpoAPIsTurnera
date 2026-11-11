@@ -19,3 +19,37 @@ jobs:
         run: |
           chmod +x mvnw
           ./mvnw -B test
+
+  mysql:
+    # Constraints, concurrencia y persistencia críticos también contra MySQL 8.4.
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: turnera_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://127.0.0.1:3306/turnera_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Tests de persistencia en MySQL
+        run: |
+          chmod +x mvnw
+          ./mvnw -B test -Dtest='EmailGlobalIntegrationTest,TurnoConcurrencyIntegrationTest,TurnoReservaIntegrationTest,AdminBootstrapIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false

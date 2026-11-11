@@ -3,6 +3,7 @@ package com.grupo1.turnera.bootstrap;
 import com.grupo1.turnera.model.Administrador;
 import com.grupo1.turnera.model.enums.Rol;
 import com.grupo1.turnera.repository.AdministradorRepository;
+import com.grupo1.turnera.service.EmailUnicidadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -19,6 +20,7 @@ public class AdminBootstrap implements ApplicationRunner {
 
     private final AdministradorRepository administradorRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailUnicidadService emailUnicidadService;
 
     @Value("${turnera.bootstrap.admin.dni:}")
     private String dni;
@@ -39,11 +41,16 @@ public class AdminBootstrap implements ApplicationRunner {
             return;
         }
 
+        // Misma política que las altas de médicos y pacientes: email normalizado y único
+        // entre todos los tipos de usuario. Si ya existe, el arranque falla con EmailDuplicadoException.
+        String emailNormalizado = emailUnicidadService.normalizar(email);
+        emailUnicidadService.reservar(emailNormalizado);
+
         Administrador administrador = Administrador.builder()
                 .dni(dni.trim())
                 .nombre(nombre.trim())
                 .apellido(apellido.trim())
-                .email(email.trim())
+                .email(emailNormalizado)
                 .password(passwordEncoder.encode(password))
                 .rol(Rol.ADMIN)
                 .activo(true)
