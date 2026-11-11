@@ -57,6 +57,10 @@ URL base local: `http://localhost:8080`
 | `POST` | `/api/turnos/reservar` | Reserva para el paciente autenticado. | Doctor y horario | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
 | `POST` | `/api/turnos/sobreturno` | Crea un sobreturno en una agenda autorizada. | Paciente, doctor, horario y justificación | `201`, `400`, `401`, `403`, `404`, `409`, `500` |
 | `PATCH` | `/api/turnos/{turnoId}/estado` | Cambia el estado con autorización e historial. | Estado destino y motivo opcional/obligatorio según transición | `200`, `400`, `401`, `403`, `404`, `409`, `500` |
+| `GET` | `/api/carrito` | Lista carritos. PACIENTE recibe solo el suyo (lista vacía si todavía no agregó turnos); ADMIN, todos. | Sin parámetros | `200` con `List<CarritoResponse>`, `401`, `403` |
+| `GET` | `/api/carrito/{carritoId}` | Devuelve un carrito con sus turnos. | Id del carrito | `200`, `401`, `403`, `404` |
+| `POST` | `/api/carrito/items` | Agrega un turno al carrito del paciente autenticado; el carrito se crea con el primer turno. | Doctor y horario | `201` con `CarritoResponse`, `400`, `401`, `403`, `404`, `409` |
+| `DELETE` | `/api/carrito/items/{itemId}` | Quita un turno del carrito. | Id del ítem | `200` con `CarritoResponse`, `401`, `403`, `404` |
 
 ### Contratos high level
 
@@ -159,6 +163,23 @@ Ejemplo (`POST /api/turnos/sobreturno`, JWT de `MEDICO` o `ADMIN`):
 ```
 
 Responde `201` con `TurnoResponse`. Devuelve `400` si faltan o son inválidos la justificación o las fechas, `401` si falta un JWT válido, `403` si el rol o la agenda no están autorizados, `404` si el médico o paciente no existen o están inactivos y `409` si el horario entra en conflicto con otro turno. Los ejemplos de autorización están en [Probar el flujo Bearer](#probar-el-flujo-bearer).
+
+#### Carrito de turnos
+
+El carrito junta los turnos que el paciente piensa reservar. Cada paciente tiene como máximo un carrito, que se crea al agregar el primer turno. Un ítem es un turno concreto: médico, inicio y fin, donde el fin se calcula con la `duracionTurnoMinutos` de la agenda.
+
+Al agregar se aplican las mismas reglas que en la reserva: médico activo, horario futuro, inicio de slot dentro de la agenda y sin solapamiento con turnos activos. Estar en el carrito no ocupa el horario: otro paciente puede reservarlo mientras tanto, y la disponibilidad se vuelve a validar al reservar. El mismo turno no puede estar dos veces en el carrito.
+
+Ejemplo (`POST /api/carrito/items`, JWT de `PACIENTE`):
+
+```json
+{
+  "doctor": {"id": 1},
+  "fechaHoraInicio": "2030-01-07T09:00:00"
+}
+```
+
+Responde `201` con el carrito actualizado (`id`, `paciente` e `items` ordenados por horario). Devuelve `400` si el horario no es futuro o no coincide con la agenda, `404` si el médico no existe o está inactivo y `409` si el horario ya está ocupado o el turno ya está en el carrito. `DELETE /api/carrito/items/{itemId}` responde `200` con el carrito sin ese turno.
 
 ### Cambio de estado de un turno
 
@@ -352,6 +373,8 @@ Para Docker, guardar una clave generada de la misma forma como `JWT_SECRET=<valo
 | `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` | Público: documentación de la API |
 | `POST /api/turnos/reservar` | PACIENTE: reserva exclusivamente para sí mismo |
 | `POST /api/turnos/sobreturno` | MEDICO: su propia agenda; ADMIN: cualquier médico activo |
+| `POST /api/carrito/items` | PACIENTE: agrega turnos a su propio carrito |
+| `GET /api/carrito`, `GET /api/carrito/{carritoId}`, `DELETE /api/carrito/items/{itemId}` | PACIENTE: solo su carrito; ADMIN: cualquiera. Un carrito ajeno responde `403` |
 | `/api/admin/**` | ADMIN; prefijo reservado para futuras operaciones administrativas |
 | Cualquier otra ruta | Requiere autenticación |
 
@@ -409,7 +432,7 @@ Linux o macOS:
 ./mvnw test
 ```
 
-La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, transiciones de estado con historial, ausencia de cookies de sesión y el contrato OpenAPI, incluido el endpoint `PATCH`. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
+La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, transiciones de estado con historial, el carrito de turnos (reglas de la agenda, duplicados y carritos ajenos), ausencia de cookies de sesión y el contrato OpenAPI, incluido el endpoint `PATCH`. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
 
 ## Arquitectura y tecnologías
 
