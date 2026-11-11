@@ -98,6 +98,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/turnos/sobreturno")
                         .hasAnyRole("MEDICO", "ADMIN")
 
+                        .requestMatchers(HttpMethod.POST, "/api/carrito/items")
+                        .hasRole("PACIENTE")
+
+                        .requestMatchers("/api/carrito", "/api/carrito/**")
+                        .hasAnyRole("PACIENTE", "ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(
