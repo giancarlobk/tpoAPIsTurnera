@@ -52,4 +52,4 @@ jobs:
       - name: Tests de persistencia en MySQL
         run: |
           chmod +x mvnw
-          ./mvnw -B test -Dtest='EmailGlobalIntegrationTest,TurnoConcurrencyIntegrationTest,TurnoReservaIntegrationTest,AdminBootstrapIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false
+          ./mvnw -B test -Dtest='EmailGlobalIntegrationTest,TurnoConcurrencyIntegrationTest,TurnoReservaIntegrationTest,AdminBootstrapIntegrationTest,CarritoIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false

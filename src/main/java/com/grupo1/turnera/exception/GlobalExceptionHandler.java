@@ -279,7 +279,8 @@ public ResponseEntity<ApiErrorResponse> handleNoResourceFound(
             NumAfiliadoDuplicadoException.class,
             TelefonoDuplicadoException.class,
             MatriculaDuplicadaException.class,
-            EspecialidadDuplicadaException.class
+            EspecialidadDuplicadaException.class,
+            TurnoYaEnCarritoException.class
     })
     public ResponseEntity<ApiErrorResponse> handleConflict(
             RuntimeException exception,
