@@ -315,15 +315,83 @@ class SecurityHttpIntegrationTest {
         assertThat(pacientes.count()).isEqualTo(1);
     }
 
-    @Test
-    void despachoDeErrorPublicoConserva404YSesionNoAutentica() throws Exception {
-        assertThat(send("GET", "/api/auth/no-existe", null, null).statusCode()).isEqualTo(404);
-        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/turnos/reservar"))
-                .header("Cookie", "JSESSIONID=sesion-falsa")
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(reserva()))).build();
-        assertError(client.send(request, HttpResponse.BodyHandlers.ofString()), 401, "/api/turnos/reservar");
-    }
+
+@Test
+void despachoDeErrorPublicoConserva404YSesionNoAutentica()
+        throws Exception {
+
+    // 1. Verificar una ruta pública inexistente.
+    var respuesta404 = send("GET","/api/auth/no-existe",null,null);
+
+    // Debe responder 404 y mantener el formato JSON.
+    assertError(respuesta404,404,"/api/auth/no-existe");
+
+    var error = json(respuesta404);
+
+    assertThat(error.path("error").asText())
+            .isEqualTo("Not Found");
+
+    assertThat(error.path("message").asText())
+            .isEqualTo("La ruta solicitada no existe");
+
+    assertThat(error.hasNonNull("timestamp"))
+            .isTrue();
+
+    // No debe exponer información interna.
+    assertThat(respuesta404.body())
+            .doesNotContain(
+                    "NoResourceFoundException",
+                    "java.lang.",
+                    "org.springframework.",
+                    "stackTrace"
+            );
+
+    // 2. Verificar que una cookie falsa
+    // no autentica al usuario.
+    var request = HttpRequest.newBuilder(
+            URI.create("http://localhost:" + port + "/api/turnos/reservar"))
+    .header("Cookie", "JSESSIONID=sesion-falsa")
+    .header("Content-Type", "application/json")
+    .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(reserva())))
+    .build();
+
+    var respuesta401 = client.send(request,HttpResponse.BodyHandlers.ofString());
+
+    // Sin JWT debe continuar devolviendo 401.
+    assertError(respuesta401,401,"/api/turnos/reservar");
+}
+
+    
+@Test
+void rutaPublicaExistenteSigueSiendoAccesible()
+        throws Exception {
+
+    var respuesta = send(
+            "GET",
+            "/api/especialidades",
+            null,
+            null
+    );
+
+    assertThat(respuesta.statusCode())
+            .isEqualTo(200);
+
+    assertThat(json(respuesta).isArray())
+            .isTrue();
+}
+
+    
+@Test
+void reservaSinJwtContinuaRespondiendo401()
+        throws Exception {
+
+    var respuesta = send("POST","/api/turnos/reservar",reserva(),null);
+
+    assertError(respuesta,401,"/api/turnos/reservar");
+        }
+
+
+
 
     private HashMap<String, Object> reserva() {
         return new HashMap<>(Map.of("doctor", Map.of("id", medico.getId()),
