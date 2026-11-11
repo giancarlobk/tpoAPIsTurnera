@@ -215,13 +215,28 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
 
-        return buildResponse(
-                HttpStatus.NOT_FOUND,
-                exception.getMessage(),
-                request.getRequestURI(),
-                Map.of()
-        );
+        return buildResponse(HttpStatus.NOT_FOUND,exception.getMessage(),request.getRequestURI(),Map.of());
     }
+
+    
+/**
+ * Maneja rutas o recursos estáticos inexistentes.
+ *
+ * Evita que NoResourceFoundException termine
+ * en el manejador genérico de errores 500.
+ */
+@ExceptionHandler(NoResourceFoundException.class)
+public ResponseEntity<ApiErrorResponse> handleNoResourceFound(
+        NoResourceFoundException exception,
+        HttpServletRequest request) {
+
+    return buildResponse(
+            HttpStatus.NOT_FOUND,
+            "La ruta solicitada no existe",
+            request.getRequestURI(),
+            Map.of()
+    );
+}
 
 
         @ExceptionHandler(AgendaInvalidaException.class)
