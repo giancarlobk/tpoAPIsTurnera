@@ -19,6 +19,14 @@ public class Doctor extends BaseUsuario {
     @Column(nullable = false, unique = true, length = 50)
     private String matriculaNacional;
 
+    
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
+
+    @Column(name = "descripcion", length = 1000)
+    private String descripcion;
+
+    
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "especialidad_id", nullable = false)
     private Especialidad especialidad;
