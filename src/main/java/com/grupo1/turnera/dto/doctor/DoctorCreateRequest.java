@@ -32,8 +32,18 @@ public record DoctorCreateRequest(
         @Size(max = 50, message = "La matrícula no puede superar los 50 caracteres")
         String matriculaNacional,
 
+        
         @NotNull(message = "La especialidad es obligatoria")
-        Long especialidadId
+        Long especialidadId,
+
+        @Size(max = 500, message = "La URL de la foto no puede superar los 500 caracteres")
+        @Pattern(
+                regexp = "^https://\\S+$",
+                message = "La foto debe tener una URL HTTPS válida")
+        String fotoUrl,
+        @Size(max = 1000, message = "La descripción no puede superar los 1000 caracteres")
+        String descripcion
+
 ) {
     public DoctorCreateRequest {
         if (email != null) {
