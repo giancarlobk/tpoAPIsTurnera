@@ -101,69 +101,92 @@ public class TurnoController {
                         @RequestParam(required = false) LocalDate fecha) {
                 return ResponseEntity.ok(turnoService.obtenerDisponibles(doctorId, fecha));
     }
+    
+    // GET /api/turnos/{id}
+    @GetMapping("/{id}")
+    @ApiResponse(
+            responseCode = "200",
+            description = "Turno encontrado",
+            content = @Content(
+                    schema = @Schema(implementation = TurnoResponse.class)
+            )
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "El turno pertenece a otro usuario",
+            content = @Content(
+                    schema = @Schema(implementation = ApiErrorResponse.class)
+            )
+    )
+    @ApiResponse(
+            responseCode = "404",
+            description = "Turno no encontrado",
+            content = @Content(
+                    schema = @Schema(implementation = ApiErrorResponse.class)
+            )
+    )
+    @Operation(
+            summary = "Obtener turno por ID",
+            description = "PACIENTE consulta sus turnos, MEDICO los de su agenda y ADMIN todos.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    public ResponseEntity<TurnoResponse> obtenerPorId(
+            @PathVariable Long id,
+            @AuthenticationPrincipal BaseUsuario actor
+    ) {
+        return ResponseEntity.ok(
+                turnoService.obtenerPorId(id, actor)
+        );
+    }
+
+    // GET /api/turnos
     @GetMapping
-    @ApiResponse(responseCode = "200", description = "Página de turnos filtrados",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = TurnoPageResponse.class)))
-    @ApiResponse(responseCode = "403", description = "Filtro sobre turnos de otro paciente u otra agenda",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class)))
-    @Operation(summary = "Buscar turnos por filtros",
+    @ApiResponse(
+            responseCode = "200",
+            description = "Página de turnos filtrados",
+            content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = TurnoPageResponse.class)
+            )
+    )
+    @ApiResponse(
+            responseCode = "403",
+            description = "Filtro sobre turnos de otro paciente u otra agenda",
+            content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiErrorResponse.class)
+            )
+    )
+    @Operation(
+            summary = "Buscar turnos por filtros",
             description = "Admite filtros opcionales con paginación. PACIENTE solo ve sus turnos; "
                     + "MEDICO solo los de su agenda; ADMIN puede consultar cualquiera.",
-            security = @SecurityRequirement(name = "bearerAuth"))
-
-    
-@GetMapping("/{id}")
-@ApiResponse(
-        responseCode = "200",
-        description = "Turno encontrado",
-        content = @Content(
-                schema = @Schema(
-                        implementation = TurnoResponse.class
-                )
-        )
-)
-@ApiResponse(
-        responseCode = "403",
-        description = "El turno pertenece a otro usuario",
-        content = @Content(
-                schema = @Schema(
-                        implementation = ApiErrorResponse.class
-                )
-        )
-)
-@ApiResponse(
-        responseCode = "404",
-        description = "Turno no encontrado",
-        content = @Content(
-                schema = @Schema(
-                        implementation = ApiErrorResponse.class
-                )
-        )
-)
-@Operation(
-        summary = "Obtener turno por ID",
-        description = "PACIENTE consulta sus turnos, MEDICO los de su agenda y ADMIN todos.",
-        security = @SecurityRequirement(name = "bearerAuth")
-)
-public ResponseEntity<TurnoResponse> obtenerPorId(
-        @PathVariable Long id,
-        @AuthenticationPrincipal BaseUsuario actor
-) {
-    return ResponseEntity.ok(
-            turnoService.obtenerPorId(id, actor)
-    );
-}
-    
-        
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
     public ResponseEntity<Page<TurnoResponse>> buscarTurnos(
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long doctorId,
             @RequestParam(required = false) EstadoTurno estado,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaDesde,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fechaHasta,
-            @PageableDefault(size = 10, page = 0) Pageable pageable,
-            @AuthenticationPrincipal BaseUsuario actor) {
-        return ResponseEntity.ok(turnoService.buscarTurnosConFiltros(
-                pacienteId, doctorId, estado, fechaDesde, fechaHasta, pageable, actor));
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime fechaDesde,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime fechaHasta,
+            @PageableDefault(size = 10, page = 0)
+            Pageable pageable,
+            @AuthenticationPrincipal BaseUsuario actor
+    ) {
+        return ResponseEntity.ok(
+                turnoService.buscarTurnosConFiltros(
+                        pacienteId,
+                        doctorId,
+                        estado,
+                        fechaDesde,
+                        fechaHasta,
+                        pageable,
+                        actor
+                )
+        );
     }
 }
