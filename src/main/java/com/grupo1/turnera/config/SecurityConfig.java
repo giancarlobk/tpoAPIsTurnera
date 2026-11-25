@@ -82,15 +82,24 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 
+                        
                         .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/doctores",
-                                "/api/especialidades",
-                                "/api/turnos/disponibles"
+                            HttpMethod.GET,
+                            "/api/doctores",
+                            "/api/doctores/*",
+                            "/api/especialidades",
+                            "/api/especialidades/*",
+                            "/api/turnos/disponibles"
                         ).permitAll()
 
-                        .requestMatchers(HttpMethod.GET, "/api/turnos")
-                        .hasAnyRole("PACIENTE", "MEDICO", "ADMIN")
+
+                        
+                        .requestMatchers(
+                            HttpMethod.GET,
+                            "/api/turnos",
+                            "/api/turnos/*"
+                        ).hasAnyRole("PACIENTE", "MEDICO", "ADMIN")
+
 
                         .requestMatchers(HttpMethod.POST, "/api/turnos/reservar")
                         .hasRole("PACIENTE")
