@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 import com.grupo1.turnera.exception.ApiErrorResponse;
 
 import java.util.List;
@@ -70,3 +71,37 @@ public ResponseEntity<List<DoctorSummaryResponse>> buscar(
 }
      
 }
+
+@GetMapping("/{id}")
+@Operation(
+        summary = "Obtener médico por ID",
+        description = "Consulta los datos públicos de un médico activo."
+)
+@ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "Médico encontrado",
+                content = @Content(
+                        schema = @Schema(
+                                implementation = DoctorSummaryResponse.class
+                        )
+                )
+        ),
+        @ApiResponse(
+                responseCode = "404",
+                description = "Médico no encontrado",
+                content = @Content(
+                        schema = @Schema(
+                                implementation = ApiErrorResponse.class
+                        )
+                )
+        )
+})
+public ResponseEntity<DoctorSummaryResponse> obtenerPorId(
+        @PathVariable
+        @Positive(message = "El ID debe ser mayor que cero")
+        Long id
+) {
+    return ResponseEntity.ok(doctorService.buscarPorId(id));
+}
+
