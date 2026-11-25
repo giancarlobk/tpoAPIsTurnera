@@ -303,6 +303,66 @@ public class TurnoService {
                 turno.getFechaHoraInicio().isBefore(fin) && turno.getFechaHoraFin().isAfter(inicio));
     }
 
+
+    
+/**
+ * Busca un turno por ID y valida que el usuario
+ * autenticado tenga permiso para consultarlo.
+ *
+ * PACIENTE: solo sus turnos.
+ * MEDICO: solo su agenda.
+ * ADMIN: cualquier turno.
+ */
+@Transactional(readOnly = true)
+public TurnoResponse obtenerPorId(Long id, BaseUsuario actor) {
+
+    // Verificar que el usuario tenga un rol permitido.
+    exigirRol(actor, Rol.PACIENTE, Rol.MEDICO, Rol.ADMIN);
+
+    // Buscar el turno en la base de datos.
+    Turno turno = turnoRepository.findById(id)
+            .orElseThrow(() ->
+                    new RecursoNoEncontradoException("Turno", id)
+            );
+
+    // El administrador puede consultar cualquier turno.
+    if (actor.getRol() == Rol.ADMIN) {
+        return TurnoResponse.fromEntity(turno);
+    }
+
+    // El paciente solo puede consultar sus turnos.
+    if (actor.getRol() == Rol.PACIENTE) {
+
+        if (turno.getPaciente() == null ||
+                !turno.getPaciente().getId().equals(actor.getId())) {
+
+            throw new AccessDeniedException(
+                    "El paciente solo puede consultar sus propios turnos"
+            );
+        }
+
+        return TurnoResponse.fromEntity(turno);
+    }
+
+    // El médico solo puede consultar turnos de su agenda.
+    if (actor.getRol() == Rol.MEDICO) {
+
+        if (!turno.getDoctor().getId().equals(actor.getId())) {
+
+            throw new AccessDeniedException(
+                    "El médico solo puede consultar su propia agenda"
+            );
+        }
+
+        return TurnoResponse.fromEntity(turno);
+    }
+
+    // Defensa adicional ante roles no contemplados.
+    throw new AccessDeniedException(
+            "No tiene permisos para consultar este turno"
+    );
+}
+
     @Transactional(readOnly = true)
     public Page<TurnoResponse> buscarTurnosConFiltros(
             Long pacienteId, Long doctorId, EstadoTurno estado,
