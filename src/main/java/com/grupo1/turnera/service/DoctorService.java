@@ -39,6 +39,24 @@ public class DoctorService {
                 .toList();
     }
 
+    
+/**
+ * Busca un médico activo por su ID.
+ * Devuelve 404 cuando el profesional no existe
+ * o se encuentra inactivo.
+ */
+@Transactional(readOnly = true)
+public DoctorSummaryResponse buscarPorId(Long id) {
+    Doctor doctor = doctorRepository.findById(id)
+            .filter(d -> d.isEnabled() && d.getRol() == Rol.MEDICO)
+            .orElseThrow(() ->
+                    new RecursoNoEncontradoException("Médico", id)
+            );
+
+    return toSummary(doctor);
+}
+
+
     @Transactional
     public DoctorSummaryResponse registrar(DoctorCreateRequest request) {
         return crear(request.dni(), request.nombre(), request.apellido(), request.email(),
