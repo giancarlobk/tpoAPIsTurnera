@@ -70,7 +70,6 @@ public ResponseEntity<List<DoctorSummaryResponse>> buscar(
     return ResponseEntity.ok(doctorService.buscar(especialidadId, nombre));
 }
      
-}
 
 @GetMapping("/{id}")
 @Operation(
