@@ -103,4 +103,4 @@ public ResponseEntity<DoctorSummaryResponse> obtenerPorId(
 ) {
     return ResponseEntity.ok(doctorService.buscarPorId(id));
 }
-
+}
