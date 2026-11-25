@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,12 +21,18 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/especialidades")
-@Tag(name = "Especialidades", description = "Registro y consulta de especialidades medicas")
+@Validated
+@Tag(
+    name = "Especialidades",
+    description = "Registro y consulta de especialidades medicas"
+)
 public class EspecialidadController {
 
     @Autowired
@@ -57,4 +64,39 @@ public class EspecialidadController {
         List<EspecialidadResponse> especialidades = especialidadService.obtenerTodas();
         return ResponseEntity.ok(especialidades);
     }
+
+    
+@GetMapping("/{id}")
+@Operation(
+        summary = "Obtener especialidad por ID",
+        description = "Consulta una especialidad por su identificador."
+)
+@ApiResponses({
+        @ApiResponse(
+                responseCode = "200",
+                description = "Especialidad encontrada",
+                content = @Content(
+                        schema = @Schema(
+                                implementation = EspecialidadResponse.class
+                        )
+                )
+        ),
+        @ApiResponse(
+                responseCode = "404",
+                description = "Especialidad inexistente",
+                content = @Content(
+                        schema = @Schema(
+                                implementation = ApiErrorResponse.class
+                        )
+                )
+        )
+})
+public ResponseEntity<EspecialidadResponse> obtenerPorId(
+        @PathVariable
+        @Positive(message = "El ID debe ser mayor que cero")
+        Long id
+) {
+    return ResponseEntity.ok(especialidadService.obtenerPorId(id));
+}
+
 }
