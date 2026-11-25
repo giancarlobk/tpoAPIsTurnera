@@ -3,6 +3,7 @@ package com.grupo1.turnera.service;
 import com.grupo1.turnera.dto.especialidad.EspecialidadCreateRequest;
 import com.grupo1.turnera.dto.especialidad.EspecialidadResponse;
 import com.grupo1.turnera.exception.EspecialidadDuplicadaException;
+import com.grupo1.turnera.exception.RecursoNoEncontradoException;
 import com.grupo1.turnera.model.Especialidad;
 import com.grupo1.turnera.repository.EspecialidadRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,23 @@ public class EspecialidadService {
                 .map(EspecialidadResponse::fromEntity)
                 .toList();
     }
+
+    
+/**
+ * Obtiene una especialidad por su identificador.
+ */
+public EspecialidadResponse obtenerPorId(Long id) {
+    Especialidad especialidad =
+            especialidadRepository.findById(id)
+                    .orElseThrow(() ->
+                            new RecursoNoEncontradoException(
+                                    "Especialidad", id
+                            )
+                    );
+
+    return EspecialidadResponse.fromEntity(especialidad);
+}
+
 
     public EspecialidadResponse crear(EspecialidadCreateRequest request) {
         String nombre = request.nombre().trim();
