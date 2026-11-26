@@ -6,6 +6,7 @@ import com.grupo1.turnera.dto.paciente.PacienteResponse;
 import org.springframework.http.HttpStatus;
 import com.grupo1.turnera.dto.auth.LoginResponse;
 import com.grupo1.turnera.exception.ApiErrorResponse;
+import com.grupo1.turnera.security.SesionCookie;
 import com.grupo1.turnera.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthenticationService authService;
+    private final SesionCookie sesionCookie;
 
     @PostMapping("/register")
     @Operation(summary = "Registrar usuario", description = "Registro público de pacientes con BCrypt; rol PACIENTE asignado por el servidor.")
@@ -44,7 +47,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Iniciar sesión", description = "Valida mediante AuthenticationManager y devuelve un JWT firmado. Usar Authorization: Bearer <token>.")
+    @Operation(summary = "Iniciar sesión", description = "Valida mediante AuthenticationManager y devuelve un JWT firmado. "
+            + "El navegador lo recibe en una cookie HttpOnly (SameSite=Strict, Path=/api); "
+            + "otros clientes pueden usar el token del cuerpo con Authorization: Bearer <token>.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Credenciales válidas",
                     content = @Content(schema = @Schema(implementation = LoginResponse.class))),
@@ -54,6 +59,9 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, sesionCookie.crear(response.token()).toString())
+                .body(response);
     }
 }

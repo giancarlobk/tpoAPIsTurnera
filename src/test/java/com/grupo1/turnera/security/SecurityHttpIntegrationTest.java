@@ -432,7 +432,12 @@ void reservaSinJwtContinuaRespondiendo401()
     private String login(String email) throws Exception {
         var response = send("POST", "/api/auth/login", Map.of("email", email, "password", PASSWORD), null);
         assertThat(response.statusCode()).isEqualTo(200);
-        assertThat(response.headers().allValues("Set-Cookie")).isEmpty();
+        // El login entrega el JWT en una cookie HttpOnly; no se crea una sesión de servidor.
+        var cookies = response.headers().allValues("Set-Cookie");
+        assertThat(cookies).noneMatch(cookie -> cookie.startsWith("JSESSIONID="));
+        assertThat(cookies).filteredOn(cookie -> cookie.startsWith("turnera_sesion="))
+                .singleElement().satisfies(cookie -> assertThat(cookie)
+                        .contains("HttpOnly", "SameSite=Strict", "Path=/api", "Max-Age=3600"));
         var json = json(response);
         assertThat(json.path("tokenType").asText()).isEqualTo("Bearer");
         assertThat(json.path("expiresIn").asLong()).isEqualTo(3600);
