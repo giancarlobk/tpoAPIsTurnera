@@ -4,6 +4,7 @@ import com.grupo1.turnera.repository.UsuarioRepository;
 import com.grupo1.turnera.security.JwtFilter;
 import com.grupo1.turnera.security.JwtUtil;
 import com.grupo1.turnera.security.SecurityErrorHandler;
+import com.grupo1.turnera.security.SesionCookie;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,7 +48,8 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtUtil jwt,
             UserDetailsService users,
-            SecurityErrorHandler errors
+            SecurityErrorHandler errors,
+            SesionCookie sesionCookie
     ) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
@@ -107,7 +109,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(
-                        new JwtFilter(jwt, users, errors),
+                        new JwtFilter(jwt, users, errors, sesionCookie),
                         UsernamePasswordAuthenticationFilter.class
                 )
                 .build();
