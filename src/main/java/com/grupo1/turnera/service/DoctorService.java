@@ -39,29 +39,72 @@ public class DoctorService {
                 .toList();
     }
 
+
     @Transactional
     public DoctorSummaryResponse registrar(DoctorCreateRequest request) {
-        return crear(request.dni(), request.nombre(), request.apellido(), request.email(),
-                request.password(), null, request.matriculaNacional(), request.especialidadId());
-    }
+        return crear(
+            request.dni(),
+            request.nombre(),
+            request.apellido(),
+            request.email(),
+            request.password(),
+            null,
+            request.matriculaNacional(),
+            request.especialidadId(),
+            request.fotoUrl(),
+            request.descripcion()
+    );
+}
 
-    /** Alta desde /api/admin/doctores: mismas validaciones que el alta común, más el teléfono opcional. */
-    @Transactional
-    public DoctorSummaryResponse registrarDesdeAdministracion(
-            com.grupo1.turnera.dto.admin.DoctorCreateRequest request) {
-        return crear(request.dni(), request.nombre(), request.apellido(), request.email(),
-                request.password(), request.telefono(), request.matriculaNacional(), request.especialidadId());
-    }
 
-    private DoctorSummaryResponse crear(String dniRecibido, String nombre, String apellido, String emailRecibido,
-                                        String password, String telefonoRecibido, String matriculaRecibida,
-                                        Long especialidadId) {
+
+@Transactional
+public DoctorSummaryResponse registrarDesdeAdministracion(
+        com.grupo1.turnera.dto.admin.DoctorCreateRequest request) {
+
+    return crear(
+            request.dni(),
+            request.nombre(),
+            request.apellido(),
+            request.email(),
+            request.password(),
+            request.telefono(),
+            request.matriculaNacional(),
+            request.especialidadId(),
+            request.fotoUrl(),
+            request.descripcion()
+    );
+}
+
+
+   
+private DoctorSummaryResponse crear(
+        String dniRecibido,
+        String nombre,
+        String apellido,
+        String emailRecibido,
+        String password,
+        String telefonoRecibido,
+        String matriculaRecibida,
+        Long especialidadId,
+        String fotoUrlRecibida,
+        String descripcionRecibida
+) {
+
         passwordPolicyValidator.validateForEncoding(password);
 
         String dni = dniRecibido.trim();
         String email = emailUnicidadService.normalizar(emailRecibido);
         String matricula = matriculaRecibida.trim();
         String telefono = telefonoRecibido == null || telefonoRecibido.isBlank() ? null : telefonoRecibido.trim();
+        String fotoUrl = fotoUrlRecibida == null || fotoUrlRecibida.isBlank()
+                ? null
+                : fotoUrlRecibida.trim();
+    String descripcion =
+        descripcionRecibida == null || descripcionRecibida.isBlank()
+                ? null
+                : descripcionRecibida.trim();
+
 
         if (doctorRepository.findByDni(dni).isPresent()) {
             throw new DniDuplicadoException(dni);
@@ -89,19 +132,25 @@ public class DoctorService {
                 .activo(true)
                 .matriculaNacional(matricula)
                 .especialidad(especialidad)
+                .fotoUrl(fotoUrl)
+                .descripcion(descripcion)
                 .build();
 
         return toSummary(doctorRepository.save(doctor));
     }
 
-    private DoctorSummaryResponse toSummary(Doctor doctor) {
-        return new DoctorSummaryResponse(
-                doctor.getId(),
-                doctor.getNombre(),
-                doctor.getApellido(),
-                doctor.getMatriculaNacional(),
-                doctor.getEspecialidad().getId(),
-                doctor.getEspecialidad().getNombre()
-        );
-    }
+
+private DoctorSummaryResponse toSummary(Doctor doctor) {
+    return new DoctorSummaryResponse(
+            doctor.getId(),
+            doctor.getNombre(),
+            doctor.getApellido(),
+            doctor.getMatriculaNacional(),
+            doctor.getEspecialidad().getId(),
+            doctor.getEspecialidad().getNombre(),
+            doctor.getFotoUrl(),
+            doctor.getDescripcion()
+    );
+}
+
 }

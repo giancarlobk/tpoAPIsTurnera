@@ -147,10 +147,20 @@ class EmailGlobalIntegrationTest {
         CountDownLatch inicio = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Future<String> medico = executor.submit(() -> resultado(inicio, () ->
-                    doctorService.registrar(new DoctorCreateRequest(
-                            "43111222", "Cora", "Medica", email.toUpperCase(),
-                            "ClaveSegura123", "MN-CONC", especialidad.getId()))));
+
+Future<String> medico = executor.submit(() -> resultado(inicio, () ->
+        doctorService.registrar(new DoctorCreateRequest(
+                "43111222",
+                "Cora",
+                "Medica",
+                email.toUpperCase(),
+                "ClaveSegura123",
+                "MN-CONC",
+                especialidad.getId(),
+                null,
+                null
+        ))));
+
             Future<String> paciente = executor.submit(() -> resultado(inicio, () ->
                     pacienteService.registrarPaciente(new PacienteCreateRequest(
                             "44111222", "Dina", "Paciente", email,
