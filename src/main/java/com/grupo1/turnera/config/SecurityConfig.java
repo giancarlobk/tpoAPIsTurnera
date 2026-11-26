@@ -6,6 +6,11 @@ import com.grupo1.turnera.security.JwtUtil;
 import com.grupo1.turnera.security.SecurityErrorHandler;
 import com.grupo1.turnera.security.SesionCookie;
 import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import java.util.Set;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -52,7 +57,11 @@ public class SecurityConfig {
             SesionCookie sesionCookie
     ) throws Exception {
         return http
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository(sesionCookie))
+                        // Token sin enmascarar: el front lo lee de la cookie XSRF-TOKEN y lo devuelve en X-XSRF-TOKEN.
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        .requireCsrfProtectionMatcher(request -> requiereCsrf(request, sesionCookie)))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(cache -> cache.disable())
@@ -117,4 +126,30 @@ public class SecurityConfig {
                 )
                 .build();
     }
+
+    /**
+     * Doble envío del token CSRF: Spring deja el token en la cookie XSRF-TOKEN (legible por JS, a diferencia de la
+     * cookie de sesión) y exige que vuelva en el header X-XSRF-TOKEN. Otro sitio no puede leer esa cookie,
+     * así que no puede armar el header.
+     */
+    private static CookieCsrfTokenRepository csrfTokenRepository(SesionCookie sesionCookie) {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookieCustomizer(cookie -> cookie.sameSite("Strict").secure(sesionCookie.isSecure()));
+        return repository;
+    }
+
+    /**
+     * El CSRF solo es posible cuando el navegador manda la credencial solo (la cookie de sesión).
+     * Los clientes con header Bearer no lo necesitan, los métodos de lectura no modifican nada, y login y
+     * registro aceptan solo JSON, que otro sitio no puede enviar sin pasar por CORS.
+     */
+    private static boolean requiereCsrf(HttpServletRequest request, SesionCookie sesionCookie) {
+        return !METODOS_SEGUROS.contains(request.getMethod())
+                && request.getHeader(HttpHeaders.AUTHORIZATION) == null
+                && !RUTAS_SIN_CSRF.contains(request.getRequestURI())
+                && sesionCookie.leer(request).isPresent();
+    }
+
+    private static final Set<String> METODOS_SEGUROS = Set.of("GET", "HEAD", "OPTIONS", "TRACE");
+    private static final Set<String> RUTAS_SIN_CSRF = Set.of("/api/auth/login", "/api/auth/register");
 }

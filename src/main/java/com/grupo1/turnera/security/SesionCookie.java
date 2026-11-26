@@ -57,6 +57,10 @@ public class SesionCookie {
         return nombre;
     }
 
+    public boolean isSecure() {
+        return secure;
+    }
+
     private ResponseCookie.ResponseCookieBuilder base(String valor) {
         return ResponseCookie.from(nombre, valor)
                 .httpOnly(true)

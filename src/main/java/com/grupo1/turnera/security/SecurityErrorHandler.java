@@ -10,6 +10,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,7 +33,10 @@ public class SecurityErrorHandler implements AuthenticationEntryPoint, AccessDen
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
                        AccessDeniedException exception) throws IOException {
-        write(request, response, HttpStatus.FORBIDDEN, "No tiene permisos para esta operación");
+        String mensaje = exception instanceof CsrfException
+                ? "Falta el token CSRF o no es válido"
+                : "No tiene permisos para esta operación";
+        write(request, response, HttpStatus.FORBIDDEN, mensaje);
     }
 
     private void write(HttpServletRequest request, HttpServletResponse response,

@@ -10,7 +10,10 @@ import com.grupo1.turnera.dto.auth.SesionResponse;
 import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.security.SesionCookie;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import java.time.Instant;
@@ -65,11 +68,14 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Credenciales inválidas",
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest,
+                                               HttpServletResponse httpResponse) {
         LoginResponse response = authService.login(request);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, sesionCookie.crear(response.token()).toString())
-                .body(response);
+        // Se agrega a la respuesta del servlet (no al ResponseEntity) para no pisar la cookie XSRF-TOKEN.
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, sesionCookie.crear(response.token()).toString());
+        emitirTokenCsrf(httpRequest);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/me")
@@ -84,16 +90,27 @@ public class AuthController {
                     content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public ResponseEntity<SesionResponse> sesionActual(@AuthenticationPrincipal BaseUsuario actor,
-                                                       Authentication authentication) {
+                                                       Authentication authentication,
+                                                       HttpServletRequest httpRequest) {
+        emitirTokenCsrf(httpRequest);
         return ResponseEntity.ok(authService.sesionActual(actor, (Instant) authentication.getDetails()));
     }
 
     @PostMapping("/logout")
     @Operation(summary = "Cerrar sesión", description = "Borra la cookie de sesión del navegador. Responde 204 aunque no haya sesión.")
     @ApiResponse(responseCode = "204", description = "Cookie de sesión borrada")
-    public ResponseEntity<Void> logout() {
-        return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, sesionCookie.borrar().toString())
-                .build();
+    public ResponseEntity<Void> logout(HttpServletResponse httpResponse) {
+        httpResponse.addHeader(HttpHeaders.SET_COOKIE, sesionCookie.borrar().toString());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * El token CSRF se genera recién cuando alguien lo pide; al pedirlo acá, la respuesta trae la cookie XSRF-TOKEN
+     * que el front devuelve en el header X-XSRF-TOKEN de los pedidos que modifican datos.
+     */
+    private static void emitirTokenCsrf(HttpServletRequest request) {
+        if (request.getAttribute(CsrfToken.class.getName()) instanceof CsrfToken token) {
+            token.getToken();
+        }
     }
 }
