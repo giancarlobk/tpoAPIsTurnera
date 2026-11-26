@@ -56,7 +56,8 @@ class AuthServiceTest {
         var config = new SecurityConfig();
         var manager = config.authenticationManager(config.userDetailsService(usuarios), passwordEncoder);
         var jwt = new JwtUtil("c2VjcmV0by1zb2xvLXBhcmEtcHJ1ZWJhcy1qd3QtdHVybmVyYS0xMjM0NTY=", 3600000);
-        authService = new AuthenticationService(manager, org.mockito.Mockito.mock(PacienteService.class), jwt);
+        authService = new AuthenticationService(manager, org.mockito.Mockito.mock(PacienteService.class), jwt,
+                java.time.Clock.systemUTC());
     }
 
     @Test

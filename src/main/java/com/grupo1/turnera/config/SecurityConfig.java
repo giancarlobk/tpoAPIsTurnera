@@ -65,6 +65,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me")
+                        .authenticated()
+
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/v3/api-docs/**",

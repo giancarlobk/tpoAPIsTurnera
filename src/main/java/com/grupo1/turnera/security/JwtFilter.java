@@ -75,6 +75,8 @@ public class JwtFilter extends OncePerRequestFilter {
         }
         var auth = UsernamePasswordAuthenticationToken.authenticated(
                 usuario, null, List.of(new SimpleGrantedAuthority(role)));
+        // El vencimiento del token queda disponible para GET /api/auth/me.
+        auth.setDetails(claims.getExpiration().toInstant());
         var context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(auth);
         SecurityContextHolder.setContext(context);

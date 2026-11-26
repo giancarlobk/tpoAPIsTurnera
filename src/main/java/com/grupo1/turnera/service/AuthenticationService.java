@@ -2,6 +2,7 @@ package com.grupo1.turnera.service;
 
 import com.grupo1.turnera.dto.auth.LoginRequest;
 import com.grupo1.turnera.dto.auth.LoginResponse;
+import com.grupo1.turnera.dto.auth.SesionResponse;
 import com.grupo1.turnera.dto.paciente.PacienteCreateRequest;
 import com.grupo1.turnera.dto.paciente.PacienteResponse;
 import com.grupo1.turnera.exception.CredencialesInvalidasException;
@@ -9,6 +10,9 @@ import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -21,6 +25,7 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final PacienteService pacienteService;
     private final JwtUtil jwtUtil;
+    private final Clock clock;
 
     @Transactional
     public PacienteResponse register(PacienteCreateRequest request) {
@@ -42,5 +47,11 @@ public class AuthenticationService {
         } catch (AuthenticationException exception) {
             throw new CredencialesInvalidasException();
         }
+    }
+
+    public SesionResponse sesionActual(BaseUsuario usuario, Instant vencimiento) {
+        long restantes = Math.max(0, Duration.between(clock.instant(), vencimiento).getSeconds());
+        return new SesionResponse(usuario.getId(), usuario.getNombre(), usuario.getApellido(),
+                usuario.getEmail(), usuario.getRol(), restantes);
     }
 }

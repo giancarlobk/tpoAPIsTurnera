@@ -6,7 +6,14 @@ import com.grupo1.turnera.dto.paciente.PacienteResponse;
 import org.springframework.http.HttpStatus;
 import com.grupo1.turnera.dto.auth.LoginResponse;
 import com.grupo1.turnera.exception.ApiErrorResponse;
+import com.grupo1.turnera.dto.auth.SesionResponse;
+import com.grupo1.turnera.model.BaseUsuario;
 import com.grupo1.turnera.security.SesionCookie;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import java.time.Instant;
 import com.grupo1.turnera.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -63,5 +70,30 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, sesionCookie.crear(response.token()).toString())
                 .body(response);
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Sesión actual",
+            description = "Devuelve el usuario autenticado por la cookie de sesión (o el header Bearer), sin el token. "
+                    + "El front lo usa para recuperar la sesión al recargar la página.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Sesión válida",
+                    content = @Content(schema = @Schema(implementation = SesionResponse.class))),
+            @ApiResponse(responseCode = "401", description = "No hay sesión o venció",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+    })
+    public ResponseEntity<SesionResponse> sesionActual(@AuthenticationPrincipal BaseUsuario actor,
+                                                       Authentication authentication) {
+        return ResponseEntity.ok(authService.sesionActual(actor, (Instant) authentication.getDetails()));
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Cerrar sesión", description = "Borra la cookie de sesión del navegador. Responde 204 aunque no haya sesión.")
+    @ApiResponse(responseCode = "204", description = "Cookie de sesión borrada")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, sesionCookie.borrar().toString())
+                .build();
     }
 }
