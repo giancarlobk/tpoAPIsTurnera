@@ -8,6 +8,7 @@ import com.grupo1.turnera.security.SesionCookie;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import java.util.Set;
@@ -61,7 +62,10 @@ public class SecurityConfig {
                         .csrfTokenRepository(csrfTokenRepository(sesionCookie))
                         // Token sin enmascarar: el front lo lee de la cookie XSRF-TOKEN y lo devuelve en X-XSRF-TOKEN.
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                        .requireCsrfProtectionMatcher(request -> requiereCsrf(request, sesionCookie)))
+                        .requireCsrfProtectionMatcher(request -> requiereCsrf(request, sesionCookie))
+                        // Por defecto Spring rota el token CSRF en cada autenticación. Con JWT el filtro autentica
+                        // cada pedido, así que lo borraría siempre y el siguiente POST fallaría con 403.
+                        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .requestCache(cache -> cache.disable())

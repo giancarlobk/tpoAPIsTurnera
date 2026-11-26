@@ -115,6 +115,27 @@ class SesionCookieIntegrationTest {
     }
 
     @Test
+    void lasConsultasAutenticadasNoBorranElTokenCsrf() throws Exception {
+        MvcResult login = login();
+        Cookie sesion = cookie(login, "turnera_sesion");
+        Cookie csrf = cookie(login, "XSRF-TOKEN");
+
+        // Como al navegar: varias consultas con la cookie antes de modificar algo.
+        for (int i = 0; i < 2; i++) {
+            MvcResult consulta = mockMvc.perform(get("/api/carrito").cookie(sesion, csrf))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            assertThat(consulta.getResponse().getHeaders("Set-Cookie"))
+                    .noneMatch(cookie -> cookie.startsWith("XSRF-TOKEN="));
+            assertThat(consulta.getResponse().getCookie("XSRF-TOKEN")).isNull();
+        }
+
+        mockMvc.perform(post("/api/carrito/items").cookie(sesion, csrf).header("X-XSRF-TOKEN", csrf.getValue())
+                        .contentType(MediaType.APPLICATION_JSON).content(ITEM_CARRITO))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void losClientesBearerNoNecesitanTokenCsrf() throws Exception {
         String token = login().getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
 
