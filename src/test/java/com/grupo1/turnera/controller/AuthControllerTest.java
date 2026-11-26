@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(AuthController.class)
 @org.springframework.context.annotation.Import({
         com.grupo1.turnera.config.SecurityConfig.class, com.grupo1.turnera.config.PasswordConfig.class,
-        com.grupo1.turnera.security.SecurityErrorHandler.class})
+        com.grupo1.turnera.security.SecurityErrorHandler.class, com.grupo1.turnera.security.SesionCookie.class})
 class AuthControllerTest {
 
     @MockitoBean

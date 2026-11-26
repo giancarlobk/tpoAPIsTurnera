@@ -45,7 +45,9 @@ URL base local: `http://localhost:8080`
 | Método | Endpoint | Descripción | Entrada principal | Respuestas |
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/auth/register` | Registra un paciente con BCrypt. | Datos de PacienteCreateRequest | `201`, `400`, `409` |
-| `POST` | `/api/auth/login` | Autentica y emite un JWT para un usuario activo. | `email`, `password` | `200`, `400`, `401` |
+| `POST` | `/api/auth/login` | Autentica y emite un JWT para un usuario activo: en el cuerpo y en la cookie HttpOnly `turnera_sesion`. | `email`, `password` | `200`, `400`, `401` |
+| `GET` | `/api/auth/me` | Devuelve el usuario de la sesión actual, sin el token, y los segundos que le quedan. | Cookie de sesión o Bearer | `200` con `SesionResponse`, `401` |
+| `POST` | `/api/auth/logout` | Borra la cookie de sesión. | Con cookie: header `X-XSRF-TOKEN` | `204`, `403` |
 | `GET` | `/api/doctores` | Lista médicos activos y permite combinar filtros. | Query opcional: `especialidadId`, `nombre` | `200`, `400` |
 | `POST` | `/api/pacientes` | Registra un paciente con rol `PACIENTE`. | Datos personales, contacto y cobertura | `201`, `400`, `409` |
 | `POST` | `/api/admin/especialidades` | Crea una especialidad. Requiere `ADMIN`. | Nombre y descripción | `201`, `400`, `401`, `403`, `409` |
@@ -338,12 +340,28 @@ Los contratos de turnos documentan los cuerpos de éxito: `/api/turnos` devuelve
 
 Se sigue el flujo de Clase 05: `AuthController → AuthenticationService → AuthenticationManager → UserDetailsService → UsuarioRepository`. El registro delega la construcción, validación y persistencia en `PacienteService` dentro de una transacción. `BaseUsuario` implementa `UserDetails` para pacientes, médicos y administradores, sin cambiar la estructura de las tablas. `UsuarioRepository` reúne las consultas de las tres tablas y rechaza identidades ambiguas.
 
-`JwtUtil` emite y valida; `JwtFilter` corre antes de `UsernamePasswordAuthenticationFilter`. Cada request verifica firma, vencimiento, identidad y rol contra la cuenta actual. Una cuenta desactivada o un rol modificado invalidan el uso del token anterior. CSRF se deshabilita porque la API usa únicamente Bearer enviado explícitamente en el header. No usa sesiones, form login, autenticación Basic ni cookies para autenticar.
+`JwtUtil` emite y valida; `JwtFilter` corre antes de `UsernamePasswordAuthenticationFilter`. Cada request verifica firma, vencimiento, identidad y rol contra la cuenta actual. Una cuenta desactivada o un rol modificado invalidan el uso del token anterior. El JWT llega en el header `Authorization: Bearer` (Swagger, Postman, tests) o en la cookie de sesión del navegador. No hay sesiones de servidor, form login ni autenticación Basic.
+
+### Sesión del navegador: cookie HttpOnly
+
+Para que la sesión del front sobreviva a una recarga (F5) sin que el JavaScript pueda leer el token, el login también entrega el JWT en una cookie. Se descartaron `localStorage` y `redux-persist` porque dejan el token al alcance de cualquier script inyectado (XSS).
+
+| Ataque | Mitigación |
+| --- | --- |
+| XSS: robar el token | La cookie `turnera_sesion` es `HttpOnly`: `document.cookie` no la ve. El cuerpo de `/api/auth/me` no incluye el token. |
+| CSRF: otro sitio usa la cookie | `SameSite=Strict`: el navegador no la manda en pedidos que salen de otro sitio. Además, token CSRF de doble envío: la cookie `XSRF-TOKEN` (legible) debe volver en el header `X-XSRF-TOKEN`, y otro sitio no puede leerla. |
+| Token interceptado o eterno | `Secure` (solo HTTPS), `Path=/api` y `Max-Age` igual al vencimiento del JWT. `POST /api/auth/logout` la borra. |
+
+Reglas del CSRF: se exige en `POST`, `PUT`, `PATCH` y `DELETE` cuando el pedido trae la cookie de sesión y no trae header `Authorization`. Los clientes Bearer no lo necesitan (el header no lo agrega el navegador solo). Login y registro quedan exentos porque solo aceptan JSON, que otro sitio no puede enviar sin pasar por CORS. Un token CSRF ausente o distinto responde `403` con `Falta el token CSRF o no es válido`.
+
+Una cookie de sesión vencida o inválida no bloquea las rutas públicas: el backend la borra y el pedido sigue como anónimo; las rutas protegidas responden `401`. El front llega al backend por el proxy `/api` (Vite en desarrollo, nginx en Docker), así que ambos son el mismo origen y no hace falta CORS con credenciales.
 
 ### Configuración
 
 - `jwt.secret` / `JWT_SECRET`: obligatorio, Base64 de al menos 32 bytes aleatorios. No tiene valor por defecto.
 - `jwt.expiration` / `JWT_EXPIRATION`: duración en milisegundos; por defecto `3600000`, mínimo `1000`.
+- `turnera.sesion.cookie.secure` / `TURNERA_SESION_COOKIE_SECURE`: por defecto `true`. Los navegadores aceptan cookies `Secure` en `http://localhost`; desactivarlo solo para probar por HTTP desde otro host.
+- `turnera.sesion.cookie.nombre`: por defecto `turnera_sesion`.
 - `.env` está ignorado por Git y Docker Compose lo lee. Maven no carga `.env`: usar variables del proceso o propiedades externas.
 
 Para ejecutar desde PowerShell, generar una clave en la sesión y mantenerla mientras se reinicia el backend:
@@ -364,7 +382,8 @@ Para Docker, guardar una clave generada de la misma forma como `JWT_SECRET=<valo
 
 | Método y ruta | Acceso |
 | --- | --- |
-| `/api/auth/**` | Público: registro y login |
+| `GET /api/auth/me` | Autenticado: el usuario de la cookie de sesión o del Bearer |
+| `/api/auth/**` | Público: registro, login y logout |
 | `POST /api/pacientes` | Público: alias del registro, siempre crea PACIENTE |
 | `GET /api/doctores`, `GET /api/especialidades` | Público: catálogo para elegir profesional |
 | `POST /api/doctores`, `POST /api/especialidades` | ADMIN: altas administrativas |
@@ -432,7 +451,7 @@ Linux o macOS:
 ./mvnw test
 ```
 
-La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, transiciones de estado con historial, el carrito de turnos (reglas de la agenda, duplicados y carritos ajenos), ausencia de cookies de sesión y el contrato OpenAPI, incluido el endpoint `PATCH`. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
+La suite incluye pruebas unitarias, `spring-security-test`, MockMvc y pruebas HTTP reales con `HttpClient` contra Tomcat en un puerto aleatorio. H2 usa una base aislada por contexto. Se verifican BCrypt y persistencia, JWT firmado, credenciales incorrectas, firma alterada/ajena, expiración, permisos 401/403, cuentas desactivadas, cambios de rol, suplantación de paciente/médico, transiciones de estado con historial, el carrito de turnos (reglas de la agenda, duplicados y carritos ajenos), la sesión por cookie (atributos de la cookie, `/me`, logout y CSRF), ausencia de cookies de sesión y el contrato OpenAPI, incluido el endpoint `PATCH`. Las pruebas no requieren configurar un secreto real ni conectarse a MySQL.
 
 ## Arquitectura y tecnologías
 
